@@ -1,4 +1,4 @@
-# JS Diploma (Game)
+# JS 2D Fantasy
 
 ## Концепция игры
 
