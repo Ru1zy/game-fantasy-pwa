@@ -1,16 +1,16 @@
-/**
- * index - индекс поля
- * boardSize - размер квадратного поля (в длину или ширину)
- * @returns строка - тип ячейки на поле:
- * top-left
- * top-right
- * top
- * bottom-left
- * bottom-right
- * bottom
- * right
- * left
- * center
+/*
+  index - индекс поля
+  boardSize - размер квадратного поля (в длину или ширину)
+  @returns строка - тип ячейки на поле:
+  top-left
+  top-right
+  top
+  bottom-left
+  bottom-right
+  bottom
+  right
+  left
+  center
  */
 export function calcTileType(index, boardSize) {
   if (index === 0) return "top-left";
