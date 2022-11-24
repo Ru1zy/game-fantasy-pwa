@@ -7,6 +7,7 @@ import Swordman from './characters/Swordman';
 import Undead from './characters/Undead';
 import Vampire from './characters/Vampire';
 import PositionedCharacter from './PositionedCharacter';
+import { createCharacterInfo } from './utils';
 
 export default class GameController {
   constructor(gamePlay, stateService) {
@@ -15,6 +16,7 @@ export default class GameController {
     this.playerCharacterTypes = [Swordman, Magician, Bowman];
     this.currentLevel = 0;
     this.currentTurn = 'player';
+    this.selectedChar = null;
     this.playerOptions = {
       side: 'player',
       allowedTypes: [Swordman, Magician, Bowman],
@@ -47,6 +49,7 @@ export default class GameController {
     // TODO: add event listeners to gamePlay events
     // TODO: load saved stated from stateService
     this.gamePlay.addNewGameListener(() => this.startNewGame());
+    this.gamePlay.addCellEnterListener((index) => this.onCellEnter(index));
     this.startNewGame();
   }
 
@@ -85,15 +88,47 @@ export default class GameController {
       }
     }
   }
+
+  getCellChildIndex(index) {
+    const cell = this.gamePlay.cells[index];
+    return cell.firstChild;
+  }
+
+  playerCell(index) {
+    const cellChild = this.getCellChildIndex(index);
+    return cellChild?.classlist.contains('player');
+  }
+
+  enemyCell(index) {
+    const cellChild = this.getCellChildIndex(index);
+    return cellChild?.classlist.contains('enemy');
+  }
+
+  emptyCell(index) {
+    const cellChild = this.getCellChildIndex(index);
+    return !cellChild;
+  }
+
   onCellClick(index) {
     // TODO: react to click
   }
 
   onCellEnter(index) {
     // TODO: react to mouse enter
+    if (!this.emptyCell(index)) {
+      const positionedChar = this.positions.find((element) => element.position === index);
+      const { character } = positionedChar;
+      const message = createCharacterInfo(character);
+      this.gamePlay.showCellTooltip(message, index);
+    } else {
+      console.log('Under construction');
+    }
   }
 
   onCellLeave(index) {
     // TODO: react to mouse leave
   }
 }
+/*cursorAtEmptyCell (playerChar, index) {
+    if (this.movement)
+  }*/
