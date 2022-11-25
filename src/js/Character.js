@@ -32,4 +32,9 @@ export default class Character {
       this._health = 0;
     }
   }
+
+  calculateDamage(target) {
+    const damage = Math.max(this.attack - target.defence, this.attack * 0.1);
+    return Math.ceil(damage);
+  }
 }

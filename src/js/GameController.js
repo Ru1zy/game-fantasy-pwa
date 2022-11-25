@@ -141,11 +141,41 @@ export default class GameController {
     return target && character.attackRange >= distance;
   }
 
+  removePosChar(posChar) {
+    const index = this.positions.findIndex((element) => element === posChar);
+    if (index !== -1) {
+      this.positions.splice(index, 1);
+    } else {
+      throw new Error('You can`t just delete non-existent character');
+    }
+    if (this.selectedChar === posChar) {
+      this.selectedChar = null;
+    }
+  }
+
+  commitTeamDefeat(side) {
+    if (side === 'player') {
+      this.gamePlay.showMessage('You lose. Try again?');
+      this.startNewGame();
+    } else {
+      //next level
+    }
+  }
+
+  removeCharacter(posChar, side) {
+    const team = side === 'player' ? this.playerTeam : this.enemyTeam;
+    this.removePosChar(posChar);
+    team.removeCharacter(posChar.character);
+    if (!team.length) {
+      this.commitTeamDefeat(side);
+    }
+  }
+
   performPlayerAction(actionType, index) {
     this.isLevelStart = false;
     if (actionType === 'attack') {
       const enemy = this.getCharByPosition(index);
-      this;
+      this.performAttack(this.selectedChar, enemy);
     }
     this.movement.moveCharacter(this.selectedChar, index);
   }
@@ -153,7 +183,19 @@ export default class GameController {
   performAttack(player, target) {
     const playerChar = player.character;
     const targetChar = target.character;
-    const damage = playerChar; //...;
+    const damage = playerChar.calculateDamage(targetChar);
+    targetChar.health -= damage;
+    this.gamePlay.showDamage(target.position, damage);
+
+    if (targetChar.health <= 0) {
+      this.removeCharacter(target, targetChar.side);
+    }
+
+    if (targetChar.side === 'player') {
+      this.gamePlay.deselectCell(target.position);
+    }
+
+    this.redrawPositions();
   }
 
   cursorAtEmptyCell(playerChar, index) {
@@ -195,8 +237,9 @@ export default class GameController {
     }
 
     if (this.enemyCell(index)) {
-      this.gamePlay.selectCell(index);
-      this.selectedChar = this.getCharByPosition(index);
+      if (this.selectedChar && this.availableForAttackCell(this.selectedChar, index)) {
+        this.performPlayerAction('attack', index);
+      }
     }
   }
 

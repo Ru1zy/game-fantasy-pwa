@@ -31,4 +31,11 @@ export default class Team {
       this.characters.push(newCharacter);
     }
   }
+
+  removeCharacter(character) {
+    const index = this.characters.findIndex((char) => char === character);
+    if (index !== -1) {
+      this.characters.splice(index, 1);
+    }
+  }
 }
