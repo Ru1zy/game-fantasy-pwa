@@ -8,11 +8,14 @@ import Undead from './characters/Undead';
 import Vampire from './characters/Vampire';
 import PositionedCharacter from './PositionedCharacter';
 import { createCharacterInfo } from './utils';
+import GameMovement from './GameMovement';
+import cursors from './cursors';
 
 export default class GameController {
   constructor(gamePlay, stateService) {
     this.gamePlay = gamePlay;
     this.stateService = stateService;
+    this.movement = new GameMovement(gamePlay, this);
     this.playerCharacterTypes = [Swordman, Magician, Bowman];
     this.currentLevel = 0;
     this.currentTurn = 'player';
@@ -50,6 +53,7 @@ export default class GameController {
     // TODO: load saved stated from stateService
     this.gamePlay.addNewGameListener(() => this.startNewGame());
     this.gamePlay.addCellEnterListener((index) => this.onCellEnter(index));
+    this.gamePlay.addCellClickListener((index) => this.onCellClick(index));
     this.startNewGame();
   }
 
@@ -59,6 +63,7 @@ export default class GameController {
     this.positions = [];
     this.positionChars(this.playerTeam, this.enemyTeam);
     this.currentLevel = 0;
+
     this.redrawPositions();
   }
 
@@ -89,19 +94,25 @@ export default class GameController {
     }
   }
 
-  getCellChildIndex(index) {
-    const cell = this.gamePlay.cells[index];
-    return cell.firstChild;
+  getTeamPositions(side) {
+    const positions = this.positions.filter((char) => char.character.side === side);
+    return positions;
   }
 
-  playerCell(index) {
-    const cellChild = this.getCellChildIndex(index);
-    return cellChild?.classlist.contains('player');
+  getCellChildIndex(index) {
+    const cell = this.gamePlay.cells[index];
+    //console.log(cell.firstChild);
+    return cell.firstChild;
   }
 
   enemyCell(index) {
     const cellChild = this.getCellChildIndex(index);
-    return cellChild?.classlist.contains('enemy');
+    return cellChild?.classList.contains('enemy');
+  }
+
+  playerCell(index) {
+    const cellChild = this.getCellChildIndex(index);
+    return cellChild?.classList.contains('player');
   }
 
   emptyCell(index) {
@@ -109,26 +120,54 @@ export default class GameController {
     return !cellChild;
   }
 
-  onCellClick(index) {
-    // TODO: react to click
+  performPlayerAction(actionType, index) {
+    this.isLevelStart = false;
+
+    this.movement.moveCharacter(this.selectedChar, index);
+  }
+
+  async onCellClick(index) {
+    // react to click
+    const selectedCell = document.getElementsByClassName('selected')[0];
+    if (selectedCell) {
+      selectedCell.classList.remove('selected', 'selected-yellow');
+    }
+
+    if (
+      this.selectedChar &&
+      this.movement.availableForMoveCell(this.selectedChar, index)
+    ) {
+      this.performPlayerAction('move', index);
+      return;
+    }
   }
 
   onCellEnter(index) {
-    // TODO: react to mouse enter
+    // react to mouse enter
     if (!this.emptyCell(index)) {
       const positionedChar = this.positions.find((element) => element.position === index);
       const { character } = positionedChar;
       const message = createCharacterInfo(character);
       this.gamePlay.showCellTooltip(message, index);
-    } else {
-      console.log('Under construction');
+    } else if (this.selectedChar) {
+      //console.log('Under construction');
+      this.cursorAtEmptyCell(this.selectedChar, index);
+    }
+
+    if (this.playerCell(index)) {
+      this.gamePlay.setCursor(cursors.pointer);
     }
   }
 
+  cursorAtEmptyCell(playerChar, index) {
+    if (this.movement.availableForMoveCell(playerChar, index)) {
+      this.gamePlay.setCursor(cursors.pointer);
+      this.gamePlay.selectCell(index, 'green');
+    } else {
+      this.gamePlay.setCursor(cursors.notallowed);
+    }
+  }
   onCellLeave(index) {
     // TODO: react to mouse leave
   }
 }
-/*cursorAtEmptyCell (playerChar, index) {
-    if (this.movement)
-  }*/

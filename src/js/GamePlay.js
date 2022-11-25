@@ -64,7 +64,7 @@ export default class GamePlay {
       this.boardEl.appendChild(cellEl);
     }
 
-    this.cells = Array.from(this.boardEl.children);
+    this.cells = Array.from(this.boardEl.querySelectorAll('.cell'));
   }
 
   /**
@@ -156,6 +156,7 @@ export default class GamePlay {
   onCellEnter(event) {
     event.preventDefault();
     const index = this.cells.indexOf(event.currentTarget);
+    this.lastEnteredCellIndex = index;
     this.cellEnterListeners.forEach((o) => o.call(null, index));
   }
 
