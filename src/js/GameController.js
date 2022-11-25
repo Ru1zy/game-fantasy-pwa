@@ -133,10 +133,27 @@ export default class GameController {
       selected.forEach((element) => element.classList.remove('selected-red'));
     }
   }
+
+  availableForAttackCell(player, targetPosition) {
+    const { character, position } = player;
+    const target = this.getCharByPosition(targetPosition);
+    const { distance } = this.movement.calcDistance(position, targetPosition);
+    return target && character.attackRange >= distance;
+  }
+
   performPlayerAction(actionType, index) {
     this.isLevelStart = false;
-
+    if (actionType === 'attack') {
+      const enemy = this.getCharByPosition(index);
+      this;
+    }
     this.movement.moveCharacter(this.selectedChar, index);
+  }
+
+  performAttack(player, target) {
+    const playerChar = player.character;
+    const targetChar = target.character;
+    const damage = playerChar; //...;
   }
 
   cursorAtEmptyCell(playerChar, index) {
