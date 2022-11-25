@@ -54,6 +54,7 @@ export default class GameController {
     this.gamePlay.addNewGameListener(() => this.startNewGame());
     this.gamePlay.addCellEnterListener((index) => this.onCellEnter(index));
     this.gamePlay.addCellClickListener((index) => this.onCellClick(index));
+    this.gamePlay.addCellLeaveListener((index) => this.onCellLeave(index));
     this.startNewGame();
   }
 
@@ -120,10 +121,40 @@ export default class GameController {
     return !cellChild;
   }
 
+  selectEnemyCharacter(index) {
+    this.gamePlay.selectCell(index, 'red');
+  }
+
+  deselectEnemyCharacter(index) {
+    if (index) {
+      this.gamePlay.deselectCell(index);
+    } else {
+      const selected = document.getElementsByClassName('selected-red');
+      selected.forEach((element) => element.classList.remove('selected-red'));
+    }
+  }
   performPlayerAction(actionType, index) {
     this.isLevelStart = false;
 
     this.movement.moveCharacter(this.selectedChar, index);
+  }
+
+  cursorAtEmptyCell(playerChar, index) {
+    if (this.movement.availableForMoveCell(playerChar, index)) {
+      this.gamePlay.setCursor(cursors.pointer);
+      this.gamePlay.selectCell(index, 'green');
+    } else {
+      this.gamePlay.setCursor(cursors.notallowed);
+    }
+  }
+
+  cursorAtEnemyCell(playerChar, index) {
+    if (this.movement.availableForMoveCell(playerChar, index)) {
+      this.gamePlay.setCursor(cursors.pointer);
+      this.gamePlay.selectCell(index, 'green');
+    } else {
+      this.gamePlay.setCursor(cursors.notallowed);
+    }
   }
 
   async onCellClick(index) {
@@ -139,6 +170,16 @@ export default class GameController {
     ) {
       this.performPlayerAction('move', index);
       return;
+    }
+
+    if (this.playerCell(index)) {
+      this.gamePlay.selectCell(index);
+      this.selectedChar = this.getCharByPosition(index);
+    }
+
+    if (this.enemyCell(index)) {
+      this.gamePlay.selectCell(index);
+      this.selectedChar = this.getCharByPosition(index);
     }
   }
 
@@ -157,17 +198,21 @@ export default class GameController {
     if (this.playerCell(index)) {
       this.gamePlay.setCursor(cursors.pointer);
     }
-  }
 
-  cursorAtEmptyCell(playerChar, index) {
-    if (this.movement.availableForMoveCell(playerChar, index)) {
-      this.gamePlay.setCursor(cursors.pointer);
-      this.gamePlay.selectCell(index, 'green');
-    } else {
-      this.gamePlay.setCursor(cursors.notallowed);
+    if (this.selectedChar && this.enemyCell(index)) {
+      this.cursorAtEnemyCell(this.selectedChar, index);
     }
   }
+
   onCellLeave(index) {
-    // TODO: react to mouse leave
+    if (this.selectedChar?.position !== index) {
+      this.gamePlay.deselectCell(index);
+    }
+
+    this.gamePlay.setCursor(cursors.auto);
+    const cell = this.gamePlay.cells[index];
+    if (cell.classList.contains('character')) {
+      this.gamePlay.hideCellTooltip(index);
+    }
   }
 }

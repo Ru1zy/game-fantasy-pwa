@@ -12,11 +12,24 @@ export default class Character {
     this.level = level;
     this.attack = 0;
     this.defence = 0;
-    this.health = 50;
+    this._health = 50;
     this.type = type;
     // выбросить исключение, если кто-то использует "new Character()"
     if (new.target.name === 'Character') {
       throw new Error('Dude, stop call dat. Call already created characters.');
+    }
+  }
+  get health() {
+    return this._health;
+  }
+
+  set health(points) {
+    this._health = points;
+    if (this._health > 100) {
+      this._health = 100;
+    }
+    if (this._health <= 0) {
+      this._health = 0;
     }
   }
 }
