@@ -47,14 +47,13 @@ export default class GameController {
   }
 
   init() {
-    this.theme = themes.prairie;
-    this.gamePlay.drawUi(this.theme);
-    // TODO: add event listeners to gamePlay events
-    // TODO: load saved stated from stateService
-    this.gamePlay.addNewGameListener(() => this.startNewGame());
     this.gamePlay.addCellEnterListener((index) => this.onCellEnter(index));
     this.gamePlay.addCellClickListener((index) => this.onCellClick(index));
     this.gamePlay.addCellLeaveListener((index) => this.onCellLeave(index));
+    this.theme = themes.prairie;
+    this.gamePlay.drawUi(this.theme);
+    this.gamePlay.addNewGameListener(() => this.startNewGame());
+    // TODO: load saved stated from stateService
     this.startNewGame();
   }
 
@@ -208,9 +207,9 @@ export default class GameController {
   }
 
   cursorAtEnemyCell(playerChar, index) {
-    if (this.movement.availableForMoveCell(playerChar, index)) {
-      this.gamePlay.setCursor(cursors.pointer);
-      this.gamePlay.selectCell(index, 'green');
+    if (this.availableForAttackCell(playerChar, index)) {
+      this.gamePlay.setCursor(cursors.crosshair);
+      this.gamePlay.selectCell(index, 'red-dashed');
     } else {
       this.gamePlay.setCursor(cursors.notallowed);
     }
