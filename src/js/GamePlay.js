@@ -14,6 +14,7 @@ export default class GamePlay {
     this.saveGameListeners = [];
     this.loadGameListeners = [];
     this.playerFrozen = false;
+    this.audio = new Audio(soundfile);
   }
 
   bindToDOM(container) {
@@ -251,15 +252,10 @@ export default class GamePlay {
   }
 
   addSong() {
-    const audio = new Audio(soundfile);
-
-    audio.currentTime = 0;
-    audio.preload = 'auto';
-    audio.loop = true;
-    if (!audio.paused) {
-      audio.pause();
-    } else {
-      audio.play();
-    }
+    this.audio.currentTime = 0;
+    this.audio.preload = 'auto';
+    this.audio.loop = true;
+    this.audio.pause();
+    this.audio.play();
   }
 }
