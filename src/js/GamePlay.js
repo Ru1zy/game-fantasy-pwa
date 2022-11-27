@@ -1,5 +1,6 @@
 import { calcHealthLevel, calcTileType } from './utils';
 import soundfile from '../audio/classic.mp3';
+//import themes from './themes';
 
 export default class GamePlay {
   constructor() {
@@ -224,21 +225,21 @@ export default class GamePlay {
   }
 
   showDamage(index, damage) {
-    //return new Promise((resolve) => {
-    const cell = this.cells[index];
-    const { offsetTop, offsetLeft } = cell;
-    const damageEl = document.createElement('span');
-    damageEl.textContent = damage;
-    damageEl.classList.add('damage');
-    damageEl.style.top = `${offsetTop}px`;
-    damageEl.style.left = `${offsetLeft}px`;
-    cell.insertAdjacentElement('afterend', damageEl);
+    return new Promise((resolve) => {
+      const cell = this.cells[index];
+      const { offsetTop, offsetLeft } = cell;
+      const damageEl = document.createElement('span');
+      damageEl.textContent = damage;
+      damageEl.classList.add('damage');
+      damageEl.style.top = `${offsetTop}px`;
+      damageEl.style.left = `${offsetLeft}px`;
+      cell.insertAdjacentElement('afterend', damageEl);
 
-    damageEl.addEventListener('animationend', () => {
-      damageEl.remove();
-      //resolve();
+      damageEl.addEventListener('animationend', () => {
+        damageEl.remove();
+        resolve();
+      });
     });
-    //});
   }
 
   setCursor(cursor) {

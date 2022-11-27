@@ -42,6 +42,7 @@ body {
 }
 
 .board {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   grid-column-gap: 2px;
@@ -75,6 +76,11 @@ body {
 }
 
 .cell.selected-red::before {
+  border-color: #f00;
+  border-style: solid;
+}
+
+.cell.selected-red-dashed::before {
   border-color: #f00;
   border-style: dashed;
 }
@@ -233,13 +239,16 @@ body {
 }
 
 .damage {
+  display: block;
   position: absolute;
   width: var(--cell-size);
   text-align: center;
   z-index: 999;
   color: #f00;
   font-weight: bold;
-  animation: 500ms fade ease-out;
+  animation: 500ms animationDamage ease-out;
+  user-select: none;
+  -webkit-animation: 500ms animationDamage ease-out;
 }
 
 .user-points {
@@ -247,15 +256,16 @@ body {
   text-align: center;
   margin-top: 2rem;
 }
-@keyframes fade {
+
+@keyframes animationDamage {
   from {
     opacity: 0;
-    top: calc(var(--cell-size) * 0.5);
+    transform: translate(0, calc(var(--cell-size) * 0.5));
     font-size: 1rem;
   }
   to {
     opacity: 1;
-    top: -20px;
+    transform: translate(0, -20px);
     font-size: 1.5rem;
   }
 }
