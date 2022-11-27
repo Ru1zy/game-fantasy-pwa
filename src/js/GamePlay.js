@@ -1,4 +1,5 @@
 import { calcHealthLevel, calcTileType } from './utils';
+import soundfile from '../audio/classic.mp3';
 
 export default class GamePlay {
   constructor() {
@@ -38,6 +39,9 @@ export default class GamePlay {
       </div>
       <div class="board-container">
         <div data-id="board" class="board"></div>
+      </div>
+      <div class="game-stats">
+        <div class="user-points"> Your points: 0</div>
       </div>
     `;
 
@@ -190,11 +194,11 @@ export default class GamePlay {
     this.loadGameListeners.forEach((o) => o.call(null));
   }
 
-  static showError(message) {
+  showError(message) {
     alert(message);
   }
 
-  static showMessage(message) {
+  showMessage(message) {
     alert(message);
   }
 
@@ -244,5 +248,12 @@ export default class GamePlay {
     if (this.container === null) {
       throw new Error('GamePlay not bind to DOM');
     }
+  }
+
+  addSong() {
+    const audio = new Audio(soundfile);
+    audio.preload = 'auto';
+    audio.loop = true;
+    audio.play();
   }
 }

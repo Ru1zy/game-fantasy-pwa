@@ -242,6 +242,11 @@ body {
   animation: 500ms fade ease-out;
 }
 
+.user-points {
+  color: #fff;
+  text-align: center;
+  margin-top: 2rem;
+}
 @keyframes fade {
   from {
     opacity: 0;

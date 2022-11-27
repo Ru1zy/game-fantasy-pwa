@@ -86,7 +86,7 @@ export default class GameController {
     this.positionChars(this.playerTeam, this.enemyTeam);
     this.currentLevel = 0;
     this.startNextLevel();
-
+    this.gamePlay.addSong();
     this.redrawPositions();
   }
 
