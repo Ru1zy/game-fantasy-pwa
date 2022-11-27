@@ -120,7 +120,7 @@ export default class GameController {
       sum += char.health;
     }
     this.points += sum;
-    const [pointsDiv] = document.getElementsByClassName('user-points');
+    const [pointsDiv] = document.querySelectorAll('user-points');
     pointsDiv.textContent = `Your points: ${this.points}`;
   }
 
@@ -247,7 +247,7 @@ export default class GameController {
 
   async onCellClick(index) {
     // react to click
-    const selectedCell = document.getElementsByClassName('selected')[0];
+    const selectedCell = document.querySelectorAll('selected')[0];
     if (selectedCell) {
       selectedCell.classList.remove('selected', 'selected-yellow');
     }
