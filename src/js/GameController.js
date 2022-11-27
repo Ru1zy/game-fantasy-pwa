@@ -68,6 +68,7 @@ export default class GameController {
     this.gamePlay.drawUi(themes[this.currentLevel]);
 
     if (this.currentLevel > 1) {
+      this.calculatePoints();
       this.positions = [];
       this.playerTeam.charactersLevelUp();
 
@@ -85,6 +86,7 @@ export default class GameController {
     this.positions = [];
     this.positionChars(this.playerTeam, this.enemyTeam);
     this.currentLevel = 0;
+    this.points = 0;
     this.startNextLevel();
     this.gamePlay.addSong();
     this.redrawPositions();
@@ -96,6 +98,16 @@ export default class GameController {
       const index = this.selectedChar.position;
       this.gamePlay.selectCell(index, 'yellow');
     }
+  }
+
+  calculatePoints() {
+    let sum = 0;
+    for (const char of this.playerTeam) {
+      sum += char.health;
+    }
+    this.points += sum;
+    const [pointsDiv] = document.getElementsByClassName('user-points');
+    pointsDiv.textContent = `Your score ${this.points}`;
   }
 
   getCharByPosition(index) {

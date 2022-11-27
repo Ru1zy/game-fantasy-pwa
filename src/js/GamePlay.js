@@ -252,8 +252,14 @@ export default class GamePlay {
 
   addSong() {
     const audio = new Audio(soundfile);
+
+    audio.currentTime = 0;
     audio.preload = 'auto';
     audio.loop = true;
-    audio.play();
+    if (!audio.paused) {
+      audio.pause();
+    } else {
+      audio.play();
+    }
   }
 }
