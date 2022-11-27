@@ -3,7 +3,7 @@ export default class EnemyLogic {
     this.gameController = gameController;
     this.movement = gameController.movement;
     this.potentialActions = [];
-    this.delay = 100;
+    this.delay = 200;
   }
 
   async doAction() {

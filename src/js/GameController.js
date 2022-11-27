@@ -162,7 +162,8 @@ export default class GameController {
     if (index) {
       this.gamePlay.deselectCell(index);
     } else {
-      const selected = document.getElementsByClassName('selected-red');
+      const selected = document.querySelectorAll('selected-red');
+
       selected.forEach((elem) => elem.classList.remove('selected-red'));
     }
   }
