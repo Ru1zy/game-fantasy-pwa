@@ -8,5 +8,6 @@ export default class Swordman extends Character {
     this.attackRange = 1;
     this.moveRange = 4;
     this.side = 'player';
+    this.levelUpNewCharacter();
   }
 }

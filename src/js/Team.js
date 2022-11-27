@@ -38,4 +38,10 @@ export default class Team {
       this.characters.splice(index, 1);
     }
   }
+
+  charactersLevelUp() {
+    for (const char of this.characters) {
+      char.levelUp();
+    }
+  }
 }

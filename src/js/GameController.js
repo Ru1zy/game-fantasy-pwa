@@ -50,11 +50,33 @@ export default class GameController {
     this.gamePlay.addCellEnterListener((index) => this.onCellEnter(index));
     this.gamePlay.addCellClickListener((index) => this.onCellClick(index));
     this.gamePlay.addCellLeaveListener((index) => this.onCellLeave(index));
-    this.theme = themes.prairie;
-    this.gamePlay.drawUi(this.theme);
     this.gamePlay.addNewGameListener(() => this.startNewGame());
     // TODO: load saved stated from stateService
     this.startNewGame();
+  }
+
+  startNextLevel() {
+    this.currentLevel += 1;
+    if (this.currentLevel > 4) {
+      this.gamePlay.showMessage('You win,let`s go it again!');
+      this.startNewGame();
+    }
+
+    this.isLevelStart = true;
+    this.currentTurn = 'player';
+    this.selectedChar = null;
+    this.gamePlay.drawUi(themes[this.currentLevel]);
+
+    if (this.currentLevel > 1) {
+      this.positions = [];
+      this.playerTeam.charactersLevelUp();
+
+      const maxLvl = this.currentLevel - 1;
+      this.playerTeam.addNewCharacter(this.playerCharacterTypes, maxLvl, maxLvl);
+      this.enemyTeam = this.generateEnemyTeam();
+      this.positionChars(this.playerTeam, this.enemyTeam);
+      this.redrawPositions();
+    }
   }
 
   startNewGame() {
@@ -63,6 +85,7 @@ export default class GameController {
     this.positions = [];
     this.positionChars(this.playerTeam, this.enemyTeam);
     this.currentLevel = 0;
+    this.startNextLevel();
 
     this.redrawPositions();
   }
@@ -157,7 +180,7 @@ export default class GameController {
       this.gamePlay.showMessage('You lose. Try again?');
       this.startNewGame();
     } else {
-      //next level
+      this.startNextLevel();
     }
   }
 
@@ -179,10 +202,10 @@ export default class GameController {
     this.movement.moveCharacter(this.selectedChar, index);
   }
 
-  performAttack(player, target) {
-    const playerChar = player.character;
+  performAttack(anychar, target) {
+    const anyChar = anychar.character;
     const targetChar = target.character;
-    const damage = playerChar.calculateDamage(targetChar);
+    const damage = anyChar.calculateDamage(targetChar);
     targetChar.health -= damage;
     this.gamePlay.showDamage(target.position, damage);
 

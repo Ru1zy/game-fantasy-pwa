@@ -37,4 +37,23 @@ export default class Character {
     const damage = Math.max(this.attack - target.defence, this.attack * 0.1);
     return Math.ceil(damage);
   }
+
+  increaseStats(stat) {
+    const newValue = Math.max(this[stat], (this[stat] * (80 + this.health)) / 100);
+    this[stat] = Math.floor(newValue);
+  }
+
+  levelUp() {
+    this.level += 1;
+    this.health += 80;
+    this.increaseStats('attack');
+    this.increaseStats('defence');
+  }
+
+  levelUpNewCharacter() {
+    for (let i = 1; i < this.level; i++) {
+      this.increaseStats('attack');
+      this.increaseStats('defence');
+    }
+  }
 }

@@ -8,5 +8,6 @@ export default class Vampire extends Character {
     this.attackRange = 2;
     this.moveRange = 2;
     this.side = 'enemy';
+    this.levelUpNewCharacter();
   }
 }

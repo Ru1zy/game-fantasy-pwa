@@ -8,5 +8,6 @@ export default class Daemon extends Character {
     this.attackRange = 4;
     this.moveRange = 1;
     this.side = 'enemy';
+    this.levelUpNewCharacter();
   }
 }

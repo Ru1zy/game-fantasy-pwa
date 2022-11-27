@@ -12,6 +12,7 @@ export default class GamePlay {
     this.newGameListeners = [];
     this.saveGameListeners = [];
     this.loadGameListeners = [];
+    this.playerFrozen = false;
   }
 
   bindToDOM(container) {
@@ -157,17 +158,20 @@ export default class GamePlay {
     event.preventDefault();
     const index = this.cells.indexOf(event.currentTarget);
     this.lastEnteredCellIndex = index;
+    if (this.playerFrozen) return;
     this.cellEnterListeners.forEach((o) => o.call(null, index));
   }
 
   onCellLeave(event) {
     event.preventDefault();
     const index = this.cells.indexOf(event.currentTarget);
+    if (this.playerFrozen) return;
     this.cellLeaveListeners.forEach((o) => o.call(null, index));
   }
 
   onCellClick(event) {
     const index = this.cells.indexOf(event.currentTarget);
+    if (this.playerFrozen) return;
     this.cellClickListeners.forEach((o) => o.call(null, index));
   }
 
