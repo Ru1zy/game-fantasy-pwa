@@ -120,7 +120,7 @@ export default class GameController {
       sum += char.health;
     }
     this.points += sum;
-    const pointsDiv = document.getElementsByClassName('user-points');
+    const pointsDiv = document.querySelector('.user-points');
     pointsDiv.textContent = `Your points: ${this.points}`;
   }
 
