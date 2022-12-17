@@ -1,6 +1,6 @@
 import { calcHealthLevel, calcTileType } from './utils';
 import soundfile from '../audio/classic.mp3';
-//import themes from './themes';
+import themes from './themes';
 
 export default class GamePlay {
   constructor() {
@@ -72,6 +72,13 @@ export default class GamePlay {
     }
 
     this.cells = Array.from(this.boardEl.querySelectorAll('.cell'));
+  }
+
+  changeTheme(levelNumber) {
+    for (const theme in themes) {
+      this.boardEl.classList.remove(themes[theme]);
+    }
+    this.boardEl.classList.add(themes[levelNumber]);
   }
 
   /**

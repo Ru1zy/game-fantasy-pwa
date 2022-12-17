@@ -8,10 +8,13 @@ export default class GameStateService {
   }
 
   load() {
+    let parsed;
     try {
-      return JSON.parse(this.storage.getItem('state'));
+      parsed = JSON.parse(this.storage.getItem('state'));
     } catch (e) {
       throw new Error('Invalid state');
     }
+    if (!parsed) throw new Error('no saved data');
+    return parsed;
   }
 }

@@ -11,6 +11,7 @@ import { createCharacterInfo } from './utils';
 import GameMovement from './GameMovement';
 import cursors from './cursors';
 import EnemyLogic from './EnemyLogic';
+import GameState from './GameState';
 
 export default class GameController {
   constructor(gamePlay, stateService) {
@@ -35,8 +36,42 @@ export default class GameController {
     this.gamePlay.addCellClickListener((index) => this.onCellClick(index));
     this.gamePlay.addCellLeaveListener((index) => this.onCellLeave(index));
     this.gamePlay.addNewGameListener(() => this.startNewGame());
-    // TODO: load saved stated from stateService
+    this.gamePlay.addLoadGameListener(() => this.loadHandler());
+    this.gamePlay.addSaveGameListener(() => {
+      const data = GameState.from(this);
+      this.stateService.save(data);
+      alert('You saved your game.');
+    });
     this.startNewGame();
+  }
+
+  loadHandler() {
+    let data;
+    console.log(1);
+    try {
+      console.log(2);
+      data = this.stateService.load();
+      console.log(2);
+    } catch (e) {
+      this.gamePlay.showMessage(e.message);
+      return;
+    }
+
+    console.log(3);
+    const savedData = GameState.getSavedData(data);
+    const { gameControllerProperties: properties, playerChar, enemyChar } = savedData;
+
+    for (const prop in properties) {
+      this[prop] = properties[prop];
+    }
+    this.playerTeam.characters = playerChar;
+    this.enemyTeam.characters = enemyChar;
+    this.gamePlay.changeTheme(this.currentLevel);
+    this.redrawPositions();
+    if (this.currentTurn === 'enemy') {
+      this.enemyTurn();
+    }
+    alert('You load last save.');
   }
 
   startNewGame() {
