@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "heroku-prebuild": "npm install --dev",
-    "start": "./node_modules/webpack/.bin/webpack.js -p --progress && node server.js",
+    "start": "node server.js",
     "build": "webpack --mode production",
     "lint": "eslint .",
     "test": "echo \"Error: no test specified\" && exit 1",
