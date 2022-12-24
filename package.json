@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "let's do it",
   "main": "index.js",
-  "type": "module",
   "scripts": {
     "heroku-prebuild": "npm install --dev",
     "start": "webpack serve --mode development",
