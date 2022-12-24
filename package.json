@@ -5,8 +5,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "heroku-postbuild": "webpack --mode production --config ./webpack.prod.config.js",
-    "start":"node ./src/index.js",
+    "heroku-postbuild": "",
+    "start": "webpack serve --mode development",
     "build": "webpack --mode production",
     "lint": "eslint .",
     "test": "echo \"Error: no test specified\" && exit 1",
