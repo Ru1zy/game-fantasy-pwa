@@ -6,7 +6,6 @@
   "scripts": {
     "heroku-prebuild": "npm install --dev",
     "start": "webpack serve --mode development",
-    "somestuff": "node server.js",
     "build": "webpack --mode production",
     "lint": "eslint .",
     "test": "echo \"Error: no test specified\" && exit 1",
