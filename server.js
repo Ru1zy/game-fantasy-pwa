@@ -1,11 +1,13 @@
-var path = require('path');
-var express = require('express');
+const express = require('express');
+const app = express();
 
-var app = express();
+// use the express-static middleware
+app.use(express.static('public'));
 
-app.use(express.static(path.join(__dirname, 'dist')));
-app.set('port', process.env.PORT || 8080);
-
-var server = app.listen(app.get('port'), function () {
-  console.log('listening on port ', server.address().port);
+// define the first route
+app.get('/', function (req, res) {
+  res.send('<h1>Hello World!</h1>');
 });
+
+// start the server listening for requests
+app.listen(process.env.PORT || 3000, () => console.log('Server is running...'));
