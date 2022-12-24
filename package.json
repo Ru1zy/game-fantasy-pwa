@@ -4,7 +4,7 @@
   "description": "let's do it",
   "main": "index.js",
   "scripts": {
-    "heroku-prebuild": "npm install --dev",
+    "heroku-prebuild": "npm install --only=dev",
     "start": "node server.js",
     "build": "webpack --mode production",
     "lint": "eslint .",
@@ -44,7 +44,6 @@
     "workbox-precaching": "^6.5.4",
     "workbox-routing": "^6.5.4",
     "workbox-strategies": "^6.5.4",
-    "express": "^4.18.2",
     "workbox-window": "^6.5.4"
   },
   "jest": {
