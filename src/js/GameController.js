@@ -40,7 +40,9 @@ export default class GameController {
     this.gamePlay.addSaveGameListener(() => {
       const data = GameState.from(this);
       this.stateService.save(data);
-      alert('You saved your game.');
+      console.log(1);
+      if (data != undefined) alert('You saved your game.');
+      console.log(2);
     });
     this.startNewGame();
   }

@@ -4,6 +4,7 @@ export default class Team {
     this.side = side;
     this.characters = [];
     this.addNewCharacter(allowedTypes, maxLevel, characterCount);
+    console.log(allowedTypes);
   }
 
   *[Symbol.iterator]() {
