@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "heroku-prebuild": "npm install --dev",
+    "heroku-postbuild": "webpack -p --config ./webpack.prod.config.js --progress",
     "start":"node ./src/index.js",
     "build": "webpack --mode production",
     "lint": "eslint .",
