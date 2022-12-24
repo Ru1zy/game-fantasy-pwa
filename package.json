@@ -4,7 +4,7 @@
   "description": "let's do it",
   "main": "index.js",
   "scripts": {
-    "heroku-prebuild": "npm install --only=dev",
+    "heroku-prebuild": "npm install --production=false",
     "start": "node server.js",
     "build": "webpack --mode production",
     "lint": "eslint .",
