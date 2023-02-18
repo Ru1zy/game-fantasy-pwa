@@ -84,8 +84,19 @@ export default class GameController {
     this.positionChars(this.playerTeam, this.enemyTeam);
     this.currentLevel = 0;
     this.startNextLevel();
-    this.gamePlay.addSong();
+    //this.gamePlay.addSong();
     this.redrawPositions();
+    document.addEventListener('click', () => {
+      if (!this.gamePlay.hasClicked) {
+        this.gamePlay.addSong();
+        this.gamePlay.hasClicked = true;
+        document.removeEventListener('click', () => {
+          this.gamePlay.addSong();
+          this.gamePlay.hasClicked = true;
+          document.removeEventListener('click', this.gamePlay.addSong);
+        });
+      }
+    });
   }
   startNextLevel() {
     this.currentLevel += 1;

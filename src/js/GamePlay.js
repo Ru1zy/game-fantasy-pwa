@@ -1,6 +1,7 @@
 import { calcHealthLevel, calcTileType } from './utils';
 import soundfile from '../audio/classic.mp3';
 import themes from './themes';
+//import GameController from './GameController';
 
 export default class GamePlay {
   constructor() {
@@ -16,6 +17,7 @@ export default class GamePlay {
     this.loadGameListeners = [];
     this.playerFrozen = false;
     this.audio = new Audio(soundfile);
+    this.hasClicked = false;
   }
 
   bindToDOM(container) {
@@ -263,6 +265,8 @@ export default class GamePlay {
     this.audio.currentTime = 0;
     this.audio.preload = 'auto';
     this.audio.loop = true;
+    this.audio.autoplay = true;
+    //this.audio.muted = true;
     this.audio.pause();
     this.audio.play();
   }
