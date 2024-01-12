@@ -101,7 +101,7 @@ export default class GameController {
   startNextLevel() {
     this.currentLevel += 1;
     if (this.currentLevel > 4) {
-      this.gamePlay.showMessage('You win,let`s go it again!');
+      this.gamePlay.showMessage('You win,let`s do it again!');
       this.startNewGame();
     }
 
