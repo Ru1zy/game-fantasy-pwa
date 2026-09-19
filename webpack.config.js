@@ -7,6 +7,7 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'trash.js',
+    publicPath: 'auto',
   },
   devServer: { open: { app: { name: 'firefox' } } },
   module: {
