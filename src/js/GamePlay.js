@@ -1,6 +1,7 @@
 import { calcHealthLevel, calcTileType } from './utils';
 import soundfile from '../audio/classic.mp3';
 import themes from './themes';
+import { t, getLang, setLang } from './i18n';
 
 export default class GamePlay {
   constructor() {
@@ -15,10 +16,13 @@ export default class GamePlay {
     this.saveGameListeners = [];
     this.loadGameListeners = [];
     this.modeChangeListeners = [];
+    this.langChangeListeners = [];
     this.playerFrozen = false;
     this.audio = new Audio(soundfile);
     this.hasClicked = false;
     this.isMuted = false;
+    this.lastHudState = null;
+    this.currentLobbyParams = null;
   }
 
   bindToDOM(container) {
@@ -44,31 +48,38 @@ export default class GamePlay {
             <span class="game-badge">PWA</span>
           </div>
 
-          <div class="controls">
-            <button data-id="action-restart" class="btn btn-primary" title="Начать игру заново">Новая игра</button>
-            <button data-id="action-mode" class="btn btn-mode" title="Сменить режим">🤖 1P vs AI</button>
-            <button data-id="action-save" class="btn btn-secondary" title="Сохранить прогресс">💾 Сохранить</button>
-            <button data-id="action-load" class="btn btn-secondary" title="Загрузить сохранение">📂 Загрузить</button>
-            <button data-id="action-audio" class="btn btn-icon" title="Звук Вкл/Выкл">🔊</button>
+          <div class="header-right">
+            <div class="lang-switcher" id="langSwitcher" title="Сменить язык / Switch Language">
+              <button class="lang-btn ${getLang() === 'ru' ? 'active' : ''}" data-lang="ru">RU</button>
+              <button class="lang-btn ${getLang() === 'en' ? 'active' : ''}" data-lang="en">EN</button>
+            </div>
+
+            <div class="controls">
+              <button data-id="action-restart" class="btn btn-primary" title="${t('newGameTitle')}">${t('newGame')}</button>
+              <button data-id="action-mode" class="btn btn-mode" title="${t('modeTitle')}">${t('modePve')}</button>
+              <button data-id="action-save" class="btn btn-secondary" title="${t('saveTitle')}">${t('save')}</button>
+              <button data-id="action-load" class="btn btn-secondary" title="${t('loadTitle')}">${t('load')}</button>
+              <button data-id="action-audio" class="btn btn-icon" title="${t('audioTitle')}">🔊</button>
+            </div>
           </div>
         </header>
 
         <div class="game-hud">
           <div class="hud-item">
-            <span class="hud-label">УРОВЕНЬ</span>
+            <span class="hud-label label-level">${t('level')}</span>
             <span class="hud-value stat-level">1</span>
           </div>
           <div class="hud-item">
-            <span class="hud-label">ОЧКИ</span>
+            <span class="hud-label label-points">${t('points')}</span>
             <span class="hud-value stat-points">0</span>
           </div>
           <div class="hud-item highlight">
-            <span class="hud-label">РЕКОРД</span>
+            <span class="hud-label label-record">${t('record')}</span>
             <span class="hud-value stat-highscore">0</span>
           </div>
           <div class="hud-turn-pill turn-player">
             <span class="turn-dot"></span>
-            <span class="turn-text">Ход: Игрок (Свет)</span>
+            <span class="turn-text">${t('turnPlayer')}</span>
           </div>
         </div>
 
@@ -77,42 +88,42 @@ export default class GamePlay {
         </div>
 
         <div class="game-legend">
-          <span class="legend-item"><span class="legend-dot green"></span> Доступный ход</span>
-          <span class="legend-item"><span class="legend-dot red"></span> Зона атаки</span>
-          <span class="legend-item"><span class="legend-dot yellow"></span> Выбранный боец</span>
+          <span class="legend-item"><span class="legend-dot green"></span> <span class="legend-move-text">${t('legendMove')}</span></span>
+          <span class="legend-item"><span class="legend-dot red"></span> <span class="legend-attack-text">${t('legendAttack')}</span></span>
+          <span class="legend-item"><span class="legend-dot yellow"></span> <span class="legend-select-text">${t('legendSelect')}</span></span>
         </div>
 
         <!-- End of Match / Level Modal -->
         <div class="game-modal-overlay" id="gameModal" style="display: none;">
           <div class="game-modal">
-            <h3 class="game-modal-title" id="gameModalTitle">Победа!</h3>
-            <p class="game-modal-text" id="gameModalText">Раунд пройден</p>
-            <button class="btn btn-primary game-modal-btn" id="gameModalBtn">Продолжить</button>
+            <h3 class="game-modal-title" id="gameModalTitle">${t('victory')}</h3>
+            <p class="game-modal-text" id="gameModalText">${t('roundCleared')}</p>
+            <button class="btn btn-primary game-modal-btn" id="gameModalBtn">${t('continue')}</button>
           </div>
         </div>
 
         <!-- Online Multiplayer Lobby Modal -->
         <div class="game-modal-overlay" id="onlineLobbyModal" style="display: none;">
           <div class="game-modal lobby-modal">
-            <h3 class="game-modal-title">🌐 Онлайн-дуэль по ссылке</h3>
-            <p class="game-modal-text" id="lobbyInstructions">Отправьте эту ссылку другу, чтобы сыграть вместе:</p>
+            <h3 class="game-modal-title" id="lobbyTitle">${t('lobbyTitle')}</h3>
+            <p class="game-modal-text" id="lobbyInstructions">${t('lobbyInstructions')}</p>
             
             <div class="lobby-link-box" id="lobbyLinkContainer">
               <input type="text" readonly id="lobbyUrlInput" class="lobby-url-input" />
-              <button class="btn btn-secondary" id="lobbyCopyBtn">📋 Копировать</button>
+              <button class="btn btn-secondary" id="lobbyCopyBtn">${t('lobbyCopy')}</button>
             </div>
 
             <div class="lobby-status-panel">
-              <div class="lobby-status-text" id="lobbyStatusText">Ожидание подключения второго игрока...</div>
+              <div class="lobby-status-text" id="lobbyStatusText">${t('lobbyStatusHostWait')}</div>
               <div class="lobby-players-indicator">
-                <span class="player-badge" id="lobbyP1">Игрок 1 (Свет): ⏳ Ждем</span>
-                <span class="player-badge" id="lobbyP2">Игрок 2 (Тьма): ⏳ Ждем</span>
+                <span class="player-badge" id="lobbyP1">${t('p1Waiting')}</span>
+                <span class="player-badge" id="lobbyP2">${t('p2Waiting')}</span>
               </div>
             </div>
 
             <div class="lobby-actions">
-              <button class="btn btn-primary" id="lobbyReadyBtn" disabled>⚔️ Я готов к бою!</button>
-              <button class="btn btn-secondary" id="lobbyCancelBtn">Отмена</button>
+              <button class="btn btn-primary" id="lobbyReadyBtn" disabled>${t('lobbyReady')}</button>
+              <button class="btn btn-secondary" id="lobbyCancelBtn">${t('lobbyCancel')}</button>
             </div>
           </div>
         </div>
@@ -131,6 +142,17 @@ export default class GamePlay {
     this.modeEl.addEventListener('click', (event) => this.onModeClick(event));
     this.audioEl.addEventListener('click', () => this.toggleAudio());
 
+    this.container.querySelectorAll('.lang-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const lang = e.currentTarget.getAttribute('data-lang');
+        if (lang && lang !== getLang()) {
+          setLang(lang);
+          this.applyLanguage();
+          this.langChangeListeners.forEach((cb) => cb(lang));
+        }
+      });
+    });
+
     this.boardEl = this.container.querySelector('[data-id=board]');
     this.boardEl.classList.add(theme);
 
@@ -148,6 +170,61 @@ export default class GamePlay {
     }
 
     this.cells = Array.from(this.boardEl.querySelectorAll('.cell'));
+    this.applyLanguage();
+  }
+
+  applyLanguage() {
+    const lang = getLang();
+    document.documentElement.lang = lang;
+
+    this.container.querySelectorAll('.lang-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+    });
+
+    if (this.newGameEl) {
+      this.newGameEl.textContent = t('newGame');
+      this.newGameEl.title = t('newGameTitle');
+    }
+    if (this.saveGameEl) {
+      this.saveGameEl.textContent = t('save');
+      this.saveGameEl.title = t('saveTitle');
+    }
+    if (this.loadGameEl) {
+      this.loadGameEl.textContent = t('load');
+      this.loadGameEl.title = t('loadTitle');
+    }
+    if (this.audioEl) {
+      this.audioEl.title = t('audioTitle');
+    }
+
+    const labelLevel = this.container.querySelector('.label-level');
+    const labelPoints = this.container.querySelector('.label-points');
+    const labelRecord = this.container.querySelector('.label-record');
+    if (labelLevel) labelLevel.textContent = t('level');
+    if (labelPoints) labelPoints.textContent = t('points');
+    if (labelRecord) labelRecord.textContent = t('record');
+
+    const legendMove = this.container.querySelector('.legend-move-text');
+    const legendAttack = this.container.querySelector('.legend-attack-text');
+    const legendSelect = this.container.querySelector('.legend-select-text');
+    if (legendMove) legendMove.textContent = t('legendMove');
+    if (legendAttack) legendAttack.textContent = t('legendAttack');
+    if (legendSelect) legendSelect.textContent = t('legendSelect');
+
+    const lobbyTitle = this.container.querySelector('#lobbyTitle');
+    const lobbyCancel = this.container.querySelector('#lobbyCancelBtn');
+    const lobbyCopy = this.container.querySelector('#lobbyCopyBtn');
+    if (lobbyTitle) lobbyTitle.textContent = t('lobbyTitle');
+    if (lobbyCancel) lobbyCancel.textContent = t('lobbyCancel');
+    if (lobbyCopy) lobbyCopy.textContent = t('lobbyCopy');
+
+    if (this.lastHudState) {
+      this.updateHud(this.lastHudState);
+    }
+  }
+
+  addLanguageChangeListener(callback) {
+    this.langChangeListeners.push(callback);
   }
 
   changeTheme(levelNumber) {
@@ -180,7 +257,9 @@ export default class GamePlay {
     }
   }
 
-  updateHud({ level = 1, points = 0, highScore = 0, currentTurn = 'player', gameMode = 'pve' } = {}) {
+  updateHud({ level = 1, points = 0, highScore = 0, currentTurn = 'player', gameMode = 'pve', isOnlineHost = true } = {}) {
+    this.lastHudState = { level, points, highScore, currentTurn, gameMode, isOnlineHost };
+
     const levelEl = this.container.querySelector('.stat-level');
     const pointsEl = this.container.querySelector('.stat-points');
     const highScoreEl = this.container.querySelector('.stat-highscore');
@@ -193,12 +272,13 @@ export default class GamePlay {
     if (highScoreEl) highScoreEl.textContent = highScore;
 
     if (modeBtn) {
+      modeBtn.title = t('modeTitle');
       if (gameMode === 'pve') {
-        modeBtn.textContent = '🤖 1P vs AI';
+        modeBtn.textContent = t('modePve');
       } else if (gameMode === 'pvp') {
-        modeBtn.textContent = '👥 2P Hotseat';
+        modeBtn.textContent = t('modePvp');
       } else if (gameMode === 'online') {
-        modeBtn.textContent = '🌐 2P Онлайн';
+        modeBtn.textContent = t('modeOnline');
       }
     }
 
@@ -206,15 +286,28 @@ export default class GamePlay {
       turnPill.classList.remove('turn-player', 'turn-enemy');
       if (currentTurn === 'player') {
         turnPill.classList.add('turn-player');
-        turnText.textContent = gameMode !== 'pve' ? 'Ход: Игрок 1 (Свет)' : 'Ход: Игрок';
+        if (gameMode === 'pve') {
+          turnText.textContent = t('turnPlayer');
+        } else if (gameMode === 'pvp') {
+          turnText.textContent = t('turnPlayer1');
+        } else {
+          turnText.textContent = isOnlineHost ? t('turnOnlineYouLight') : t('turnOnlineOpponentLight');
+        }
       } else {
         turnPill.classList.add('turn-enemy');
-        turnText.textContent = gameMode !== 'pve' ? 'Ход: Игрок 2 (Тьма)' : 'Ход: Компьютер';
+        if (gameMode === 'pve') {
+          turnText.textContent = t('turnAi');
+        } else if (gameMode === 'pvp') {
+          turnText.textContent = t('turnPlayer2');
+        } else {
+          turnText.textContent = isOnlineHost ? t('turnOnlineOpponentDark') : t('turnOnlineYouDark');
+        }
       }
     }
   }
 
   showLobbyModal({ roomUrl, isHost, onReady, onCancel }) {
+    this.currentLobbyParams = { roomUrl, isHost, onReady, onCancel };
     const modal = this.container.querySelector('#onlineLobbyModal');
     const urlInput = this.container.querySelector('#lobbyUrlInput');
     const copyBtn = this.container.querySelector('#lobbyCopyBtn');
@@ -223,32 +316,44 @@ export default class GamePlay {
     const statusText = this.container.querySelector('#lobbyStatusText');
     const p1Badge = this.container.querySelector('#lobbyP1');
     const p2Badge = this.container.querySelector('#lobbyP2');
+    const instructions = this.container.querySelector('#lobbyInstructions');
+    const linkBox = this.container.querySelector('#lobbyLinkContainer');
 
     if (!modal) return;
     modal.style.display = 'flex';
 
     if (urlInput) urlInput.value = roomUrl || window.location.href;
 
+    if (instructions) {
+      instructions.textContent = isHost ? t('lobbyInstructions') : t('lobbyStatusGuestConnecting', { attempt: 1, max: 6 });
+    }
+
+    if (linkBox) {
+      linkBox.style.display = isHost ? 'flex' : 'none';
+    }
+
     if (copyBtn) {
+      copyBtn.textContent = t('lobbyCopy');
       copyBtn.onclick = () => {
         navigator.clipboard.writeText(urlInput.value).then(() => {
-          copyBtn.textContent = '✓ Скопировано!';
-          setTimeout(() => { copyBtn.textContent = '📋 Копировать'; }, 2500);
+          copyBtn.textContent = t('lobbyCopied');
+          setTimeout(() => { copyBtn.textContent = t('lobbyCopy'); }, 2500);
         });
       };
     }
 
     if (readyBtn) {
-      readyBtn.disabled = true;
-      readyBtn.textContent = '⚔️ Я готов к бою!';
+      readyBtn.disabled = !isHost;
+      readyBtn.textContent = t('lobbyReady');
       readyBtn.onclick = () => {
         readyBtn.disabled = true;
-        readyBtn.textContent = '✓ Вы готовы (Ожидание соперника)';
+        readyBtn.textContent = t('lobbyYouReady');
         if (onReady) onReady();
       };
     }
 
     if (cancelBtn) {
+      cancelBtn.textContent = t('lobbyCancel');
       cancelBtn.onclick = () => {
         modal.style.display = 'none';
         if (onCancel) onCancel();
@@ -256,16 +361,32 @@ export default class GamePlay {
     }
 
     if (statusText) {
-      statusText.textContent = isHost
-        ? 'Отправьте ссылку сопернику и дождитесь подключения...'
-        : 'Подключение к хосту...';
+      statusText.textContent = isHost ? t('lobbyStatusHostWait') : t('lobbyStatusGuestConnecting', { attempt: 1, max: 6 });
     }
 
-    if (p1Badge) p1Badge.textContent = 'Игрок 1 (Свет): ⏳ Ждем';
-    if (p2Badge) p2Badge.textContent = 'Игрок 2 (Тьма): ⏳ Ждем';
+    // Explicitly show who YOU are in the room!
+    if (p1Badge) {
+      p1Badge.classList.remove('ready');
+      if (isHost) {
+        p1Badge.textContent = t('p1HostYou');
+        p1Badge.classList.add('ready');
+      } else {
+        p1Badge.textContent = t('p1Waiting');
+      }
+    }
+
+    if (p2Badge) {
+      p2Badge.classList.remove('ready');
+      if (isHost) {
+        p2Badge.textContent = t('p2Waiting');
+      } else {
+        p2Badge.textContent = t('p2GuestYou');
+        p2Badge.classList.add('ready');
+      }
+    }
   }
 
-  updateLobbyStatus({ status, p1Ready, p2Ready, canReady }) {
+  updateLobbyStatus({ status, p1Ready, p2Ready, canReady, isHost }) {
     const statusText = this.container.querySelector('#lobbyStatusText');
     const readyBtn = this.container.querySelector('#lobbyReadyBtn');
     const p1Badge = this.container.querySelector('#lobbyP1');
@@ -275,12 +396,29 @@ export default class GamePlay {
     if (readyBtn && canReady !== undefined) readyBtn.disabled = !canReady;
 
     if (p1Badge) {
-      p1Badge.textContent = p1Ready ? 'Игрок 1 (Свет): ✓ ГОТОВ' : 'Игрок 1 (Свет): ⏳ Готовится';
-      p1Badge.classList.toggle('ready', p1Ready);
+      if (p1Ready) {
+        p1Badge.textContent = t('p1Ready');
+        p1Badge.classList.add('ready');
+      } else if (isHost) {
+        p1Badge.textContent = t('p1HostYou');
+        p1Badge.classList.add('ready');
+      } else {
+        p1Badge.textContent = t('p1HostOther');
+        p1Badge.classList.add('ready');
+      }
     }
+
     if (p2Badge) {
-      p2Badge.textContent = p2Ready ? 'Игрок 2 (Тьма): ✓ ГОТОВ' : 'Игрок 2 (Тьма): ⏳ Готовится';
-      p2Badge.classList.toggle('ready', p2Ready);
+      if (p2Ready) {
+        p2Badge.textContent = t('p2Ready');
+        p2Badge.classList.add('ready');
+      } else if (isHost) {
+        p2Badge.textContent = p2Ready ? t('p2Ready') : t('p2GuestOther');
+        p2Badge.classList.toggle('ready', Boolean(p2Ready));
+      } else {
+        p2Badge.textContent = t('p2GuestYou');
+        p2Badge.classList.add('ready');
+      }
     }
   }
 
@@ -289,7 +427,7 @@ export default class GamePlay {
     if (modal) modal.style.display = 'none';
   }
 
-  showEndGameModal(title, text, btnText = 'Играть снова', onConfirm = null) {
+  showEndGameModal(title, text, btnText = null, onConfirm = null) {
     const modal = this.container.querySelector('#gameModal');
     const modalTitle = this.container.querySelector('#gameModalTitle');
     const modalText = this.container.querySelector('#gameModalText');
@@ -298,7 +436,7 @@ export default class GamePlay {
     if (!modal) return;
     modalTitle.textContent = title;
     modalText.textContent = text;
-    modalBtn.textContent = btnText;
+    modalBtn.textContent = btnText || t('playAgain');
     modal.style.display = 'flex';
 
     modalBtn.onclick = () => {

@@ -13,6 +13,7 @@ import cursors from './cursors';
 import EnemyLogic from './EnemyLogic';
 import GameState from './GameState';
 import NetworkManager from './NetworkManager';
+import { t } from './i18n';
 
 export default class GameController {
   constructor(gamePlay, stateService) {
@@ -51,6 +52,12 @@ export default class GameController {
     this.gamePlay.addLoadGameListener(() => this.loadHandler());
     this.gamePlay.addSaveGameListener(() => this.saveHandler());
     this.gamePlay.addModeChangeListener(() => this.cycleGameMode());
+    this.gamePlay.addLanguageChangeListener(() => {
+      this.updateHud();
+      if (this.gamePlay.lastEnteredCellIndex !== undefined) {
+        this.onCellEnter(this.gamePlay.lastEnteredCellIndex);
+      }
+    });
 
     this.startNewGame();
 
@@ -58,10 +65,21 @@ export default class GameController {
     const urlParams = new URLSearchParams(window.location.search);
     const roomFromUrl = urlParams.get('room');
     if (roomFromUrl) {
+      this.cleanUrlParams();
       setTimeout(() => {
         this.joinOnlineRoom(roomFromUrl);
-      }, 500);
+      }, 400);
     }
+  }
+
+  cleanUrlParams() {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('room')) {
+        url.searchParams.delete('room');
+        window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
+      }
+    } catch (e) {}
   }
 
   cycleGameMode() {
@@ -71,6 +89,7 @@ export default class GameController {
     } else if (this.gameMode === 'pvp') {
       this.startOnlineLobby();
     } else {
+      this.cleanUrlParams();
       this.network.disconnect();
       this.gameMode = 'pve';
       this.startNewGame();
@@ -90,19 +109,22 @@ export default class GameController {
         roomUrl,
         onReady: () => this.handleLocalReady(),
         onCancel: () => {
+          this.cleanUrlParams();
           this.network.disconnect();
           this.gameMode = 'pve';
           this.startNewGame();
         },
       });
     }).catch((err) => {
-      this.gamePlay.showMessage(`Не удалось создать комнату: ${err.message}`);
+      this.gamePlay.showMessage(t('lobbyErrorConnect', { error: err.message }));
+      this.cleanUrlParams();
       this.gameMode = 'pve';
       this.updateHud();
     });
   }
 
   joinOnlineRoom(roomId) {
+    this.cleanUrlParams();
     this.gameMode = 'online';
     this.isOnlineHost = false;
     this.isLocalReady = false;
@@ -113,14 +135,21 @@ export default class GameController {
       roomUrl: window.location.href,
       onReady: () => this.handleLocalReady(),
       onCancel: () => {
+        this.cleanUrlParams();
         this.network.disconnect();
         this.gameMode = 'pve';
         this.startNewGame();
       },
     });
 
-    this.network.joinRoom(roomId).catch((err) => {
-      this.gamePlay.showMessage(`Ошибка подключения к комнате: ${err.message}`);
+    this.network.joinRoom(roomId, (attempt, max) => {
+      this.gamePlay.updateLobbyStatus({
+        status: t('lobbyStatusGuestConnecting', { attempt, max }),
+        isHost: false,
+      });
+    }).catch((err) => {
+      this.gamePlay.showMessage(t('lobbyErrorConnect', { error: err.message }));
+      this.cleanUrlParams();
       this.gameMode = 'pve';
       this.updateHud();
     });
@@ -129,9 +158,10 @@ export default class GameController {
   onNetworkConnected(isHost) {
     this.gamePlay.updateLobbyStatus({
       status: isHost
-        ? 'Соперник подключился! Нажмите «Я готов к бою»'
-        : 'Подключено к хосту! Нажмите «Я готов к бою»',
-      canReady: true,
+        ? (this.isLocalReady ? t('lobbyStatusWaitingOpponent') : t('lobbyStatusConnected'))
+        : t('lobbyStatusConnected'),
+      canReady: !this.isLocalReady,
+      isHost,
     });
   }
 
@@ -140,14 +170,15 @@ export default class GameController {
     this.network.send({ type: 'ready' });
 
     this.gamePlay.updateLobbyStatus({
-      status: this.isRemoteReady ? 'Оба игрока готовы! Запуск...' : 'Ожидание готовности соперника...',
+      status: this.isRemoteReady ? t('lobbyStatusBothReady') : t('lobbyStatusWaitingOpponent'),
       p1Ready: this.isOnlineHost ? this.isLocalReady : this.isRemoteReady,
       p2Ready: this.isOnlineHost ? this.isRemoteReady : this.isLocalReady,
       canReady: false,
+      isHost: this.isOnlineHost,
     });
 
     if (this.isRemoteReady && this.isOnlineHost) {
-      this.launchOnlineMatch();
+      setTimeout(() => this.launchOnlineMatch(), 600);
     }
   }
 
@@ -156,6 +187,7 @@ export default class GameController {
     const gameState = GameState.from(this);
     this.network.send({ type: 'start_game', state: gameState });
     this.gamePlay.closeLobbyModal();
+    this.updateHud();
   }
 
   onNetworkMessage(data) {
@@ -164,13 +196,15 @@ export default class GameController {
     if (data.type === 'ready') {
       this.isRemoteReady = true;
       this.gamePlay.updateLobbyStatus({
-        status: this.isLocalReady ? 'Оба игрока готовы! Запуск...' : 'Соперник готов! Нажмите «Я готов к бою»',
+        status: this.isLocalReady ? t('lobbyStatusBothReady') : t('lobbyStatusOpponentReady'),
         p1Ready: this.isOnlineHost ? this.isLocalReady : this.isRemoteReady,
         p2Ready: this.isOnlineHost ? this.isRemoteReady : this.isLocalReady,
+        canReady: !this.isLocalReady,
+        isHost: this.isOnlineHost,
       });
 
       if (this.isLocalReady && this.isOnlineHost) {
-        this.launchOnlineMatch();
+        setTimeout(() => this.launchOnlineMatch(), 600);
       }
     } else if (data.type === 'start_game') {
       const savedData = GameState.getSavedData(data.state);
@@ -182,9 +216,11 @@ export default class GameController {
       this.playerTeam.characters = playerChar;
       this.enemyTeam.characters = enemyChar;
       this.gameMode = 'online';
+      this.isOnlineHost = false;
       this.gamePlay.changeTheme(this.currentLevel);
       this.gamePlay.clearRanges();
       this.redrawPositions();
+      this.playerTurn();
       this.updateHud();
       this.gamePlay.closeLobbyModal();
     } else if (data.type === 'action') {
@@ -204,7 +240,8 @@ export default class GameController {
   }
 
   onNetworkDisconnected() {
-    this.gamePlay.showMessage('Соперник отключился от игры.');
+    this.cleanUrlParams();
+    this.gamePlay.showMessage(t('lobbyDisconnected'));
     this.gameMode = 'pve';
     this.updateHud();
   }
@@ -212,7 +249,7 @@ export default class GameController {
   saveHandler() {
     const data = GameState.from(this);
     this.stateService.save(data);
-    this.gamePlay.showMessage('Игра успешно сохранена!');
+    this.gamePlay.showMessage(t('saveSuccess'));
   }
 
   loadHandler() {
@@ -240,7 +277,7 @@ export default class GameController {
     if (this.currentTurn === 'enemy' && this.gameMode === 'pve') {
       this.enemyTurn();
     }
-    this.gamePlay.showMessage('Сохранение успешно загружено.');
+    this.gamePlay.showMessage(t('loadSuccess'));
   }
 
   startNewGame() {
@@ -360,6 +397,7 @@ export default class GameController {
       highScore: this.highScore,
       currentTurn: this.currentTurn,
       gameMode: this.gameMode,
+      isOnlineHost: this.isOnlineHost,
     });
   }
 
@@ -477,14 +515,21 @@ export default class GameController {
 
   commitTeamDefeat(side) {
     if (this.gameMode !== 'pve') {
-      const winner = side === 'player' ? 'Игрок 2 (Орда/Тьма)' : 'Игрок 1 (Альянс/Свет)';
-      if (side === 'player') this.p2Wins += 1;
-      else this.p1Wins += 1;
+      let winnerText = '';
+      if (this.gameMode === 'online') {
+        const isPlayerDefeat = side === 'player';
+        const won = (this.isOnlineHost && !isPlayerDefeat) || (!this.isOnlineHost && isPlayerDefeat);
+        winnerText = won ? t('onlineWinYou') : t('onlineLoseYou');
+      } else {
+        winnerText = side === 'player' ? t('pvpWinP2') : t('pvpWinP1');
+        if (side === 'player') this.p2Wins += 1;
+        else this.p1Wins += 1;
+      }
 
       this.gamePlay.showEndGameModal(
-        '⚔️ Победа в дуэли!',
-        `Победил ${winner}! Счёт серий: ${this.p1Wins} : ${this.p2Wins}`,
-        'Реванш',
+        t('victory'),
+        winnerText,
+        t('playAgain'),
         () => {
           if (this.gameMode === 'online') {
             this.network.send({ type: 'rematch' });
@@ -500,9 +545,9 @@ export default class GameController {
     if (side === 'player') {
       this.calculatePoints();
       this.gamePlay.showEndGameModal(
-        '💀 Поражение',
-        `Ваш отряд пал на уровне ${this.currentLevel}. Набрано очков: ${this.points}. Рекорд: ${this.highScore}.`,
-        'Попробовать снова',
+        t('gameOver'),
+        t('allFallen'),
+        t('playAgain'),
         () => this.startNewGame(),
       );
     } else {
@@ -613,7 +658,7 @@ export default class GameController {
           this.availableForAttackCell(this.selectedChar, index)
         ) {
           const dmg = this.selectedChar.character.calculateDamage(positionedChar.character);
-          message += ` | ⚔️ Прогноз урона: ~${dmg} HP`;
+          message += ` | ${t('estDamage', { dmg })}`;
         }
 
         this.gamePlay.showCellTooltip(message, index);
