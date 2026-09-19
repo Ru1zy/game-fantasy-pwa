@@ -3,9 +3,11 @@ export default class GameMovement {
     this.gamePlay = gamePlay;
     this.gameController = gameController;
   }
+
   calcPosByDifference(index, { verticalDifference, horizontalDifference }) {
     return index + horizontalDifference + verticalDifference * this.gamePlay.boardSize;
   }
+
   calcDistance(characterPosition, cellIndex) {
     const { boardSize } = this.gamePlay;
     const verticalDifference =
@@ -29,5 +31,28 @@ export default class GameMovement {
     const { distance } = this.calcDistance(position, targetIndex);
     const isEmpty = this.gameController.emptyCell(targetIndex);
     return isEmpty && character.moveRange >= distance;
+  }
+
+  getAvailableMoveCells(positionedChar) {
+    const cells = [];
+    const totalCells = this.gamePlay.boardSize ** 2;
+    for (let i = 0; i < totalCells; i += 1) {
+      if (this.availableForMoveCell(positionedChar, i)) {
+        cells.push(i);
+      }
+    }
+    return cells;
+  }
+
+  getAvailableAttackCells(positionedChar) {
+    const cells = [];
+    const totalCells = this.gamePlay.boardSize ** 2;
+    for (let i = 0; i < totalCells; i += 1) {
+      const { distance } = this.calcDistance(positionedChar.position, i);
+      if (distance > 0 && distance <= positionedChar.character.attackRange) {
+        cells.push(i);
+      }
+    }
+    return cells;
   }
 }

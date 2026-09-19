@@ -12,17 +12,29 @@ import GameMovement from './GameMovement';
 import cursors from './cursors';
 import EnemyLogic from './EnemyLogic';
 import GameState from './GameState';
+import NetworkManager from './NetworkManager';
 
 export default class GameController {
   constructor(gamePlay, stateService) {
     this.gamePlay = gamePlay;
     this.stateService = stateService;
     this.movement = new GameMovement(gamePlay, this);
+    this.network = new NetworkManager(this);
     this.playerCharacterTypes = [Swordman, Magician, Bowman];
+    this.enemyCharacterTypes = [Daemon, Undead, Vampire];
     this.currentLevel = 0;
     this.currentTurn = 'player';
     this.selectedChar = null;
     this.enemyLogic = new EnemyLogic(this);
+    this.gameMode = 'pve'; // 'pve' | 'pvp' | 'online'
+    this.isOnlineHost = false;
+    this.isLocalReady = false;
+    this.isRemoteReady = false;
+    this.highScore = Number(localStorage.getItem('fantasy_pwa_highscore')) || 0;
+    this.points = 0;
+    this.p1Wins = 0;
+    this.p2Wins = 0;
+
     this.playerOptions = {
       side: 'player',
       allowedTypes: [Swordman, Magician, Bowman],
@@ -37,29 +49,181 @@ export default class GameController {
     this.gamePlay.addCellLeaveListener((index) => this.onCellLeave(index));
     this.gamePlay.addNewGameListener(() => this.startNewGame());
     this.gamePlay.addLoadGameListener(() => this.loadHandler());
-    this.gamePlay.addSaveGameListener(() => {
-      const data = GameState.from(this);
-      this.stateService.save(data);
-      console.log(1);
-      if (data != undefined) alert('You saved your game.');
-      console.log(2);
-    });
+    this.gamePlay.addSaveGameListener(() => this.saveHandler());
+    this.gamePlay.addModeChangeListener(() => this.cycleGameMode());
+
     this.startNewGame();
+
+    // Проверка ссылки на онлайн-комнату при открытии
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomFromUrl = urlParams.get('room');
+    if (roomFromUrl) {
+      setTimeout(() => {
+        this.joinOnlineRoom(roomFromUrl);
+      }, 500);
+    }
+  }
+
+  cycleGameMode() {
+    if (this.gameMode === 'pve') {
+      this.gameMode = 'pvp';
+      this.startNewGame();
+    } else if (this.gameMode === 'pvp') {
+      this.startOnlineLobby();
+    } else {
+      this.network.disconnect();
+      this.gameMode = 'pve';
+      this.startNewGame();
+    }
+    this.updateHud();
+  }
+
+  startOnlineLobby() {
+    this.gameMode = 'online';
+    this.isOnlineHost = true;
+    this.isLocalReady = false;
+    this.isRemoteReady = false;
+
+    this.network.createRoom().then((roomUrl) => {
+      this.gamePlay.showLobbyModal({
+        isHost: true,
+        roomUrl,
+        onReady: () => this.handleLocalReady(),
+        onCancel: () => {
+          this.network.disconnect();
+          this.gameMode = 'pve';
+          this.startNewGame();
+        },
+      });
+    }).catch((err) => {
+      this.gamePlay.showMessage(`Не удалось создать комнату: ${err.message}`);
+      this.gameMode = 'pve';
+      this.updateHud();
+    });
+  }
+
+  joinOnlineRoom(roomId) {
+    this.gameMode = 'online';
+    this.isOnlineHost = false;
+    this.isLocalReady = false;
+    this.isRemoteReady = false;
+
+    this.gamePlay.showLobbyModal({
+      isHost: false,
+      roomUrl: window.location.href,
+      onReady: () => this.handleLocalReady(),
+      onCancel: () => {
+        this.network.disconnect();
+        this.gameMode = 'pve';
+        this.startNewGame();
+      },
+    });
+
+    this.network.joinRoom(roomId).catch((err) => {
+      this.gamePlay.showMessage(`Ошибка подключения к комнате: ${err.message}`);
+      this.gameMode = 'pve';
+      this.updateHud();
+    });
+  }
+
+  onNetworkConnected(isHost) {
+    this.gamePlay.updateLobbyStatus({
+      status: isHost
+        ? 'Соперник подключился! Нажмите «Я готов к бою»'
+        : 'Подключено к хосту! Нажмите «Я готов к бою»',
+      canReady: true,
+    });
+  }
+
+  handleLocalReady() {
+    this.isLocalReady = true;
+    this.network.send({ type: 'ready' });
+
+    this.gamePlay.updateLobbyStatus({
+      status: this.isRemoteReady ? 'Оба игрока готовы! Запуск...' : 'Ожидание готовности соперника...',
+      p1Ready: this.isOnlineHost ? this.isLocalReady : this.isRemoteReady,
+      p2Ready: this.isOnlineHost ? this.isRemoteReady : this.isLocalReady,
+      canReady: false,
+    });
+
+    if (this.isRemoteReady && this.isOnlineHost) {
+      this.launchOnlineMatch();
+    }
+  }
+
+  launchOnlineMatch() {
+    this.startNewGame();
+    const gameState = GameState.from(this);
+    this.network.send({ type: 'start_game', state: gameState });
+    this.gamePlay.closeLobbyModal();
+  }
+
+  onNetworkMessage(data) {
+    if (!data) return;
+
+    if (data.type === 'ready') {
+      this.isRemoteReady = true;
+      this.gamePlay.updateLobbyStatus({
+        status: this.isLocalReady ? 'Оба игрока готовы! Запуск...' : 'Соперник готов! Нажмите «Я готов к бою»',
+        p1Ready: this.isOnlineHost ? this.isLocalReady : this.isRemoteReady,
+        p2Ready: this.isOnlineHost ? this.isRemoteReady : this.isLocalReady,
+      });
+
+      if (this.isLocalReady && this.isOnlineHost) {
+        this.launchOnlineMatch();
+      }
+    } else if (data.type === 'start_game') {
+      const savedData = GameState.getSavedData(data.state);
+      const { gameControllerProperties: properties, playerChar, enemyChar } = savedData;
+
+      for (const prop in properties) {
+        this[prop] = properties[prop];
+      }
+      this.playerTeam.characters = playerChar;
+      this.enemyTeam.characters = enemyChar;
+      this.gameMode = 'online';
+      this.gamePlay.changeTheme(this.currentLevel);
+      this.gamePlay.clearRanges();
+      this.redrawPositions();
+      this.updateHud();
+      this.gamePlay.closeLobbyModal();
+    } else if (data.type === 'action') {
+      const actor = this.getCharByPosition(data.from);
+      if (data.actionType === 'move') {
+        this.movement.moveCharacter(actor, data.to);
+      } else if (data.actionType === 'attack') {
+        const target = this.getCharByPosition(data.to);
+        this.performAttack(actor, target);
+      }
+      this.switchTurnInternal();
+    } else if (data.type === 'rematch') {
+      if (this.isOnlineHost) {
+        this.launchOnlineMatch();
+      }
+    }
+  }
+
+  onNetworkDisconnected() {
+    this.gamePlay.showMessage('Соперник отключился от игры.');
+    this.gameMode = 'pve';
+    this.updateHud();
+  }
+
+  saveHandler() {
+    const data = GameState.from(this);
+    this.stateService.save(data);
+    this.gamePlay.showMessage('Игра успешно сохранена!');
   }
 
   loadHandler() {
     let data;
-    console.log(1);
     try {
-      console.log(2);
       data = this.stateService.load();
-      console.log(2);
     } catch (e) {
       this.gamePlay.showMessage(e.message);
       return;
     }
 
-    console.log(3);
     const savedData = GameState.getSavedData(data);
     const { gameControllerProperties: properties, playerChar, enemyChar } = savedData;
 
@@ -69,11 +233,14 @@ export default class GameController {
     this.playerTeam.characters = playerChar;
     this.enemyTeam.characters = enemyChar;
     this.gamePlay.changeTheme(this.currentLevel);
+    this.gamePlay.clearRanges();
     this.redrawPositions();
-    if (this.currentTurn === 'enemy') {
+    this.updateHud();
+
+    if (this.currentTurn === 'enemy' && this.gameMode === 'pve') {
       this.enemyTurn();
     }
-    alert('You load last save.');
+    this.gamePlay.showMessage('Сохранение успешно загружено.');
   }
 
   startNewGame() {
@@ -83,51 +250,60 @@ export default class GameController {
     this.positions = [];
     this.positionChars(this.playerTeam, this.enemyTeam);
     this.currentLevel = 0;
+    this.gamePlay.clearRanges();
     this.startNextLevel();
-    //this.gamePlay.addSong();
     this.redrawPositions();
-    document.addEventListener('click', () => {
-      if (!this.gamePlay.hasClicked) {
-        this.gamePlay.addSong();
-        this.gamePlay.hasClicked = true;
-        document.removeEventListener('click', () => {
+
+    document.addEventListener(
+      'click',
+      () => {
+        if (!this.gamePlay.hasClicked) {
           this.gamePlay.addSong();
           this.gamePlay.hasClicked = true;
-          document.removeEventListener('click', this.gamePlay.addSong);
-        });
-      }
-    });
+        }
+      },
+      { once: true },
+    );
   }
+
   startNextLevel() {
     this.currentLevel += 1;
-    if (this.currentLevel > 4) {
-      this.gamePlay.showMessage('You win,let`s do it again!');
-      this.startNewGame();
-    }
-
     this.isLevelStart = true;
     this.currentTurn = 'player';
     this.selectedChar = null;
-    this.gamePlay.drawUi(themes[this.currentLevel]);
+    this.gamePlay.clearRanges();
 
-    if (this.currentLevel > 1) {
+    if (this.currentLevel === 1) {
+      this.gamePlay.drawUi(themes[this.currentLevel]);
+    } else {
+      this.gamePlay.changeTheme(this.currentLevel);
       this.calculatePoints();
       this.positions = [];
+
       this.playerTeam.charactersLevelUp();
 
-      const maxLvl = this.currentLevel - 1;
-      this.playerTeam.addNewCharacter(this.playerCharacterTypes, maxLvl, maxLvl);
+      const maxLvl = Math.max(1, Math.min(this.currentLevel - 1, 4));
+      const charsToAdd = Math.min(2, Math.max(1, Math.floor(this.currentLevel / 2)));
+      this.playerTeam.addNewCharacter(this.playerCharacterTypes, maxLvl, charsToAdd);
+
       this.enemyTeam = this.generateEnemyTeam();
       this.positionChars(this.playerTeam, this.enemyTeam);
       this.redrawPositions();
     }
+
+    this.updateHud();
   }
 
   generateEnemyTeam() {
+    let enemyMaxLevel = 1;
+    if (this.currentLevel > 1) {
+      enemyMaxLevel = Math.max(1, Math.min(Math.floor(this.currentLevel * 0.8) + 1, 4));
+    }
+
     const options = {
       side: 'enemy',
-      allowedTypes: [Daemon, Undead, Vampire],
-      maxLevel: this.currentLevel,
+      allowedTypes: this.enemyCharacterTypes,
+      maxLevel: enemyMaxLevel,
       characterCount: this.playerTeam.length,
     };
     return new Team(options, this);
@@ -167,14 +343,28 @@ export default class GameController {
     for (const char of this.playerTeam) {
       sum += char.health;
     }
-    this.points += sum;
-    const pointsDiv = document.querySelector('.user-points');
-    pointsDiv.textContent = `Your points: ${this.points}`;
+    this.points += sum * this.currentLevel;
+
+    if (this.points > this.highScore) {
+      this.highScore = this.points;
+      try {
+        localStorage.setItem('fantasy_pwa_highscore', String(this.highScore));
+      } catch (e) {}
+    }
+  }
+
+  updateHud() {
+    this.gamePlay.updateHud({
+      level: this.currentLevel,
+      points: this.points,
+      highScore: this.highScore,
+      currentTurn: this.currentTurn,
+      gameMode: this.gameMode,
+    });
   }
 
   getTeamPositions(side) {
-    const positions = this.positions.filter((char) => char.character.side === side);
-    return positions;
+    return this.positions.filter((char) => char.character.side === side);
   }
 
   getCharByPosition(index) {
@@ -186,11 +376,10 @@ export default class GameController {
     const index = this.positions.findIndex((element) => element === posChar);
     if (index !== -1) {
       this.positions.splice(index, 1);
-    } else {
-      throw new Error('You can`t just delete non-existent character');
     }
     if (this.selectedChar === posChar) {
       this.selectedChar = null;
+      this.gamePlay.clearRanges();
     }
   }
 
@@ -199,7 +388,19 @@ export default class GameController {
     if (this.selectedChar) {
       const index = this.selectedChar.position;
       this.gamePlay.selectCell(index, 'yellow');
+      this.showRangesForChar(this.selectedChar);
     }
+  }
+
+  showRangesForChar(posChar) {
+    this.gamePlay.clearRanges();
+    if (!posChar) return;
+
+    const availableMoves = this.movement.getAvailableMoveCells(posChar);
+    this.gamePlay.showMoveRange(availableMoves);
+
+    const availableAttacks = this.movement.getAvailableAttackCells(posChar);
+    this.gamePlay.showAttackRange(availableAttacks);
   }
 
   selectEnemyCharacter(index) {
@@ -210,23 +411,42 @@ export default class GameController {
     if (index) {
       this.gamePlay.deselectCell(index);
     } else {
-      const selected = document.querySelectorAll('selected-red');
-
+      const selected = document.querySelectorAll('.selected-red');
       selected.forEach((elem) => elem.classList.remove('selected-red'));
     }
   }
 
+  switchTurnInternal() {
+    this.selectedChar = null;
+    this.gamePlay.clearRanges();
+
+    if (this.isLevelStart) {
+      this.gamePlay.playerFrozen = false;
+      this.currentTurn = 'player';
+      this.updateHud();
+      return;
+    }
+
+    this.currentTurn = this.currentTurn === 'player' ? 'enemy' : 'player';
+    this.updateHud();
+  }
+
   switchTurn(delay = 0) {
     return new Promise((resolve) => {
-      if (this.isLevelStart) {
-        this.gamePlay.isPlayerFrozen = false;
-        this.currentTurn = 'player';
-        return;
-      }
-      this.currentTurn = this.currentTurn === 'player' ? 'enemy' : 'player';
+      this.switchTurnInternal();
+
       setTimeout(() => {
         if (this.currentTurn === 'enemy') {
-          this.enemyTurn();
+          if (this.gameMode === 'pvp') {
+            this.gamePlay.playerFrozen = false;
+            this.redrawPositions();
+          } else if (this.gameMode === 'online') {
+            // В онлайн-режиме управление на стороне игрока 2 (Тьма)
+            this.gamePlay.playerFrozen = this.isOnlineHost;
+            this.redrawPositions();
+          } else {
+            this.enemyTurn();
+          }
         } else {
           this.playerTurn();
         }
@@ -236,7 +456,7 @@ export default class GameController {
   }
 
   async enemyTurn() {
-    this.gamePlay.isPlayerFrozen = true;
+    this.gamePlay.playerFrozen = true;
     this.gamePlay.setCursor(cursors.notallowed);
 
     await this.enemyLogic.doAction();
@@ -244,14 +464,47 @@ export default class GameController {
   }
 
   playerTurn() {
-    this.gamePlay.isPlayerFrozen = false;
-    this.onCellEnter(this.gamePlay.lastEnteredCellIndex);
+    if (this.gameMode === 'online') {
+      this.gamePlay.playerFrozen = !this.isOnlineHost;
+    } else {
+      this.gamePlay.playerFrozen = false;
+    }
+    this.redrawPositions();
+    if (this.gamePlay.lastEnteredCellIndex !== undefined) {
+      this.onCellEnter(this.gamePlay.lastEnteredCellIndex);
+    }
   }
 
   commitTeamDefeat(side) {
+    if (this.gameMode !== 'pve') {
+      const winner = side === 'player' ? 'Игрок 2 (Орда/Тьма)' : 'Игрок 1 (Альянс/Свет)';
+      if (side === 'player') this.p2Wins += 1;
+      else this.p1Wins += 1;
+
+      this.gamePlay.showEndGameModal(
+        '⚔️ Победа в дуэли!',
+        `Победил ${winner}! Счёт серий: ${this.p1Wins} : ${this.p2Wins}`,
+        'Реванш',
+        () => {
+          if (this.gameMode === 'online') {
+            this.network.send({ type: 'rematch' });
+            if (this.isOnlineHost) this.launchOnlineMatch();
+          } else {
+            this.startNewGame();
+          }
+        },
+      );
+      return;
+    }
+
     if (side === 'player') {
-      this.gamePlay.showMessage('You lose. Try again?');
-      this.startNewGame();
+      this.calculatePoints();
+      this.gamePlay.showEndGameModal(
+        '💀 Поражение',
+        `Ваш отряд пал на уровне ${this.currentLevel}. Набрано очков: ${this.points}. Рекорд: ${this.highScore}.`,
+        'Попробовать снова',
+        () => this.startNewGame(),
+      );
     } else {
       this.startNextLevel();
     }
@@ -266,13 +519,24 @@ export default class GameController {
     }
   }
 
-  performPlayerAction(actionType, index) {
+  performAction(actionType, index) {
     this.isLevelStart = false;
+    const actorPos = this.selectedChar.position;
+
     if (actionType === 'attack') {
-      const enemy = this.getCharByPosition(index);
-      this.performAttack(this.selectedChar, enemy);
+      const target = this.getCharByPosition(index);
+      this.performAttack(this.selectedChar, target);
     } else {
       this.movement.moveCharacter(this.selectedChar, index);
+    }
+
+    if (this.gameMode === 'online') {
+      this.network.send({
+        type: 'action',
+        actionType,
+        from: actorPos,
+        to: index,
+      });
     }
   }
 
@@ -286,59 +550,83 @@ export default class GameController {
     if (targetChar.health <= 0) {
       this.removeCharacter(target, targetChar.side);
     }
-    if (targetChar.side === 'player') {
-      this.gamePlay.deselectCell(target.position);
-    }
-
+    this.gamePlay.deselectCell(target.position);
     this.redrawPositions();
   }
 
   async onCellClick(index) {
-    // react to click
-    const selectedCell = document.querySelectorAll('selected')[0];
-    if (selectedCell) {
-      selectedCell.classList.remove('selected', 'selected-yellow');
+    if (this.gameMode === 'online') {
+      // Проверяем право хода онлайн-игрока
+      const isMyTurn = (this.isOnlineHost && this.currentTurn === 'player') ||
+                       (!this.isOnlineHost && this.currentTurn === 'enemy');
+      if (!isMyTurn) return;
     }
 
+    const activeSide = this.currentTurn;
+    const opponentSide = activeSide === 'player' ? 'enemy' : 'player';
+
+    // 1. Перемещение выбранного юнита в свободную клетку
     if (
       this.selectedChar &&
       this.movement.availableForMoveCell(this.selectedChar, index)
     ) {
-      this.performPlayerAction('move', index);
+      this.performAction('move', index);
       await this.switchTurn();
       return;
     }
 
-    if (this.playerCell(index)) {
-      this.gamePlay.selectCell(index);
-      this.selectedChar = this.getCharByPosition(index);
+    // 2. Атака вражеского юнита
+    if (this.selectedChar && this.isCellSide(index, opponentSide)) {
+      if (this.availableForAttackCell(this.selectedChar, index)) {
+        this.performAction('attack', index);
+        await this.switchTurn();
+        return;
+      }
     }
 
-    if (this.enemyCell(index)) {
-      if (this.selectedChar && this.availableForAttackCell(this.selectedChar, index)) {
-        this.performPlayerAction('attack', index);
-        await this.switchTurn();
+    // 3. Выбор своего бойца активным игроком
+    if (this.isCellSide(index, activeSide)) {
+      const posChar = this.getCharByPosition(index);
+      if (this.selectedChar === posChar) {
+        this.selectedChar = null;
+        this.gamePlay.deselectCell(index);
+        this.gamePlay.clearRanges();
+      } else {
+        this.selectedChar = posChar;
+        this.redrawPositions();
       }
     }
   }
 
   onCellEnter(index) {
-    // react to mouse enter
+    const activeSide = this.currentTurn;
+    const opponentSide = activeSide === 'player' ? 'enemy' : 'player';
+
     if (!this.emptyCell(index)) {
-      const positionedChar = this.positions.find((element) => element.position === index);
-      const { character } = positionedChar;
-      const message = createCharacterInfo(character);
-      this.gamePlay.showCellTooltip(message, index);
+      const positionedChar = this.getCharByPosition(index);
+      if (positionedChar) {
+        let message = createCharacterInfo(positionedChar.character);
+
+        if (
+          this.selectedChar &&
+          positionedChar.character.side === opponentSide &&
+          this.availableForAttackCell(this.selectedChar, index)
+        ) {
+          const dmg = this.selectedChar.character.calculateDamage(positionedChar.character);
+          message += ` | ⚔️ Прогноз урона: ~${dmg} HP`;
+        }
+
+        this.gamePlay.showCellTooltip(message, index);
+      }
     } else if (this.selectedChar) {
-      //console.log('Under construction');
       this.cursorAtEmptyCell(this.selectedChar, index);
     }
 
-    if (this.playerCell(index)) {
+    if (this.isCellSide(index, activeSide)) {
       this.gamePlay.setCursor(cursors.pointer);
     }
 
-    if (this.selectedChar && this.enemyCell(index)) {
+    if (this.selectedChar && this.isCellSide(index, opponentSide)) {
       this.cursorAtEnemyCell(this.selectedChar, index);
     }
   }
@@ -349,35 +637,20 @@ export default class GameController {
     }
 
     this.gamePlay.setCursor(cursors.auto);
-    const cell = this.gamePlay.cells[index];
-    if (cell.classList.contains('character')) {
-      this.gamePlay.hideCellTooltip(index);
-    }
+    this.gamePlay.hideCellTooltip(index);
   }
 
-  getCellChildIndex(index) {
-    const cell = this.gamePlay.cells[index];
-    //console.log(cell.firstChild);
-    return cell.firstChild;
-  }
-
-  playerCell(index) {
-    const cellChild = this.getCellChildIndex(index);
-    return cellChild?.classList.contains('player');
-  }
-
-  enemyCell(index) {
-    const cellChild = this.getCellChildIndex(index);
-    return cellChild?.classList.contains('enemy');
+  isCellSide(index, side) {
+    const char = this.getCharByPosition(index);
+    return char && char.character.side === side;
   }
 
   emptyCell(index) {
-    const cellChild = this.getCellChildIndex(index);
-    return !cellChild;
+    return !this.getCharByPosition(index);
   }
 
-  cursorAtEnemyCell(playerChar, index) {
-    if (this.availableForAttackCell(playerChar, index)) {
+  cursorAtEnemyCell(actor, index) {
+    if (this.availableForAttackCell(actor, index)) {
       this.gamePlay.setCursor(cursors.crosshair);
       this.gamePlay.selectCell(index, 'red-dashed');
     } else {
@@ -385,8 +658,8 @@ export default class GameController {
     }
   }
 
-  cursorAtEmptyCell(playerChar, index) {
-    if (this.movement.availableForMoveCell(playerChar, index)) {
+  cursorAtEmptyCell(actor, index) {
+    if (this.movement.availableForMoveCell(actor, index)) {
       this.gamePlay.setCursor(cursors.pointer);
       this.gamePlay.selectCell(index, 'green');
     } else {

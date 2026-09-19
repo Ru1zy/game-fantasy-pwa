@@ -15,7 +15,8 @@ export default class GameState {
     undead: Undead,
     vampire: Vampire,
   };
-  static from({ positions, currentTurn, currentLevel, points }) {
+
+  static from({ positions, currentTurn, currentLevel, points, gameMode, highScore, p1Wins, p2Wins }) {
     const savedPositions = [];
     for (const positionedChar of positions) {
       const { character, position } = positionedChar;
@@ -27,9 +28,28 @@ export default class GameState {
       };
       savedPositions.push(formatPositionedChar);
     }
-    return { currentTurn, currentLevel, points, savedPositions };
+    return {
+      currentTurn,
+      currentLevel,
+      points,
+      savedPositions,
+      gameMode: gameMode || 'pve',
+      highScore: highScore || 0,
+      p1Wins: p1Wins || 0,
+      p2Wins: p2Wins || 0,
+    };
   }
-  static getSavedData({ currentTurn, currentLevel, points, savedPositions }) {
+
+  static getSavedData({
+    currentTurn,
+    currentLevel,
+    points,
+    savedPositions,
+    gameMode = 'pve',
+    highScore = 0,
+    p1Wins = 0,
+    p2Wins = 0,
+  }) {
     const playerChar = [];
     const enemyChar = [];
     const positions = [];
@@ -53,7 +73,16 @@ export default class GameState {
     return {
       playerChar,
       enemyChar,
-      gameControllerProperties: { currentTurn, currentLevel, points, positions },
+      gameControllerProperties: {
+        currentTurn,
+        currentLevel,
+        points,
+        positions,
+        gameMode,
+        highScore,
+        p1Wins,
+        p2Wins,
+      },
     };
   }
 }

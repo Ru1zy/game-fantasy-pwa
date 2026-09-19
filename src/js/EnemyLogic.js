@@ -3,7 +3,7 @@ export default class EnemyLogic {
     this.gameController = gameController;
     this.movement = gameController.movement;
     this.potentialActions = [];
-    this.delay = 200;
+    this.delay = 220;
   }
 
   async doAction() {
@@ -12,11 +12,20 @@ export default class EnemyLogic {
       const enemyCharacters = this.gameController.getTeamPositions('enemy');
       this.playerCharacters = this.gameController.getTeamPositions('player');
 
+      if (!enemyCharacters.length || !this.playerCharacters.length) {
+        resolve();
+        return;
+      }
+
       for (const char of enemyCharacters) {
         this.pushCharActions(char);
       }
 
       const action = this.findBestAction(this.potentialActions);
+      if (!action) {
+        resolve();
+        return;
+      }
 
       const promise = this.performBestAction(action);
       promise.then(() => {
@@ -45,18 +54,21 @@ export default class EnemyLogic {
             resolve();
           })
           .catch(async () => {
-            // удаление действия из списка и попытка выполнить другое действие
+            // Удаление неудачного действия и выбор альтернативного
             const actionIndex = this.potentialActions.findIndex(
               (elem) => elem === action,
             );
-            this.potentialActions.splice(actionIndex, 1);
+            if (actionIndex !== -1) {
+              this.potentialActions.splice(actionIndex, 1);
+            }
             const nextAction = this.findBestAction(this.potentialActions);
 
             if (nextAction) {
               await this.performBestAction(nextAction);
               resolve();
             } else {
-              console.log('Dead end, try smth else.');
+              // Если нет прямого пути к цели, сделать любой безопасный ход
+              this.makeFallbackMove(actor);
               resolve();
             }
           });
@@ -69,11 +81,36 @@ export default class EnemyLogic {
     const { moveRange, attackRange } = character;
     const { distance } = this.movement.calcDistance(position, player.position);
 
-    const turnsNumber = Math.ceil((distance - 1) / (moveRange + attackRange - 1));
     const potentialDamage = character.calculateDamage(player.character);
-    const hitsToKill = Math.ceil(player.character.health / potentialDamage);
+    const canAttackImmediately = distance <= attackRange;
+    const canKillNow = canAttackImmediately && player.character.health <= potentialDamage;
 
-    return 1 / (hitsToKill + turnsNumber);
+    // 1. Высший приоритет - добивание цели за один удар
+    if (canKillNow) {
+      return 1000 + potentialDamage;
+    }
+
+    // 2. Возможность атаковать прямо сейчас
+    if (canAttackImmediately) {
+      let score = 500 + potentialDamage;
+      // Бонус за атаку уязвимых целей с высоким уроном (Маги и Лучники)
+      if (player.character.type === 'magician') score += 120;
+      if (player.character.type === 'bowman') score += 80;
+      // Бонус за цель с меньшим здоровьем
+      score += (100 - player.character.health) * 2;
+      return score;
+    }
+
+    // 3. Если атаковать нельзя, оцениваем сближение
+    const turnsNumber = Math.max(1, Math.ceil((distance - attackRange) / Math.max(1, moveRange)));
+    let movePriority = 100 / (turnsNumber + 1);
+
+    // Приоритет целей с малым здоровьем и опасных классов
+    if (player.character.type === 'magician') movePriority += 25;
+    if (player.character.type === 'bowman') movePriority += 15;
+    movePriority += (100 - player.character.health) * 0.3;
+
+    return movePriority;
   }
 
   pushCharActions(enemyChar) {
@@ -86,8 +123,8 @@ export default class EnemyLogic {
   }
 
   findBestAction(actionsArr) {
-    let mostEffectiveAction;
-    let highestPriority = 0;
+    let mostEffectiveAction = null;
+    let highestPriority = -Infinity;
     for (const action of actionsArr) {
       if (action.priority > highestPriority) {
         highestPriority = action.priority;
@@ -99,65 +136,56 @@ export default class EnemyLogic {
 
   moveToTarget(actor, target) {
     return new Promise((resolve, reject) => {
-      if (this.actionIsDone) return;
       const {
-        character: { moveRange },
+        character: { moveRange, attackRange },
         position: index,
       } = actor;
 
-      let { verticalDifference, horizontalDifference } = this.movement.calcDistance(
-        index,
-        target.position,
-      );
-
-      const isverticalDifferenceNegative = verticalDifference < 0;
-      const ishorizontalDifferenceNegative = horizontalDifference < 0;
-
-      if (Math.abs(verticalDifference) > moveRange - 1) {
-        verticalDifference = moveRange;
-      } else if (verticalDifference !== 0) {
-        verticalDifference = Math.abs(verticalDifference) - 1;
+      const availableMoves = this.movement.getAvailableMoveCells(actor);
+      if (!availableMoves.length) {
+        reject(new Error('No available moves'));
+        return;
       }
 
-      if (Math.abs(horizontalDifference) > moveRange - 1) {
-        horizontalDifference = moveRange;
-      } else if (horizontalDifference !== 0) {
-        horizontalDifference = Math.abs(horizontalDifference) - 1;
-      }
+      // Выбираем клетку, которая максимально приближает к цели (или ставит в идеальный радиус атаки)
+      let bestCell = null;
+      let minEvalScore = Infinity;
 
-      if (isverticalDifferenceNegative) verticalDifference *= -1;
-      if (ishorizontalDifferenceNegative) horizontalDifference *= -1;
-
-      let indexToMove = this.movement.calcPosByDifference(index, {
-        verticalDifference,
-        horizontalDifference,
-      });
-
-      // перерасчёт indexToMove, если ячейка занята другим персонажем
-      while (
-        !this.gameController.emptyCell(indexToMove) &&
-        (Math.abs(verticalDifference) > 0 || Math.abs(horizontalDifference) > 0)
-      ) {
-        if (Math.abs(verticalDifference) > Math.abs(horizontalDifference)) {
-          verticalDifference += isverticalDifferenceNegative ? 1 : -1;
-        } else {
-          horizontalDifference += ishorizontalDifferenceNegative ? 1 : -1;
+      for (const cellIndex of availableMoves) {
+        const { distance } = this.movement.calcDistance(cellIndex, target.position);
+        
+        // Для стрелков идеальная дистанция - это attackRange (кайтинг, чтобы не подходить в упор к мечникам)
+        let evalScore = distance;
+        if (attackRange > 1) {
+          if (distance <= attackRange && distance >= 2) {
+            evalScore = 0; // Идеальная стрелковая позиция
+          } else if (distance < 2) {
+            evalScore = 3; // Слишком близко в упор
+          }
         }
 
-        indexToMove = this.movement.calcPosByDifference(index, {
-          verticalDifference,
-          horizontalDifference,
-        });
+        if (evalScore < minEvalScore) {
+          minEvalScore = evalScore;
+          bestCell = cellIndex;
+        }
       }
 
-      if (indexToMove !== index) {
+      if (bestCell !== null && bestCell !== index) {
         setTimeout(() => {
-          this.movement.moveCharacter(actor, indexToMove);
+          this.movement.moveCharacter(actor, bestCell);
           resolve();
         }, this.delay);
       } else {
-        reject(new Error('Нет очевидного пути'));
+        reject(new Error('No optimal cell found'));
       }
     });
+  }
+
+  makeFallbackMove(actor) {
+    const availableMoves = this.movement.getAvailableMoveCells(actor);
+    if (availableMoves.length) {
+      const randomCell = availableMoves[Math.floor(Math.random() * availableMoves.length)];
+      this.movement.moveCharacter(actor, randomCell);
+    }
   }
 }

@@ -38,6 +38,7 @@
     "workbox-webpack-plugin": "^6.5.4"
   },
   "dependencies": {
+    "peerjs": "^1.5.5",
     "workbox-cacheable-response": "^6.5.4",
     "workbox-core": "^6.5.4",
     "workbox-expiration": "^6.5.4",
