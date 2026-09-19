@@ -23,6 +23,7 @@ export default class GamePlay {
     this.isMuted = false;
     this.lastHudState = null;
     this.currentLobbyParams = null;
+    this.toastTimeout = null;
   }
 
   bindToDOM(container) {
@@ -43,24 +44,38 @@ export default class GamePlay {
     this.container.innerHTML = `
       <div class="game-wrapper">
         <header class="game-header">
-          <div class="game-brand">
-            <span class="game-title">⚔️ FANTASY TACTICS 2D</span>
-            <span class="game-badge">PWA</span>
-          </div>
-
-          <div class="header-right">
-            <div class="lang-switcher" id="langSwitcher" title="Сменить язык / Switch Language">
-              <button class="lang-btn ${getLang() === 'ru' ? 'active' : ''}" data-lang="ru">RU</button>
-              <button class="lang-btn ${getLang() === 'en' ? 'active' : ''}" data-lang="en">EN</button>
+          <div class="header-main">
+            <div class="game-brand">
+              <span class="game-title">⚔️ FANTASY TACTICS 2D</span>
+              <span class="game-badge">PWA</span>
             </div>
 
-            <div class="controls">
-              <button data-id="action-restart" class="btn btn-primary" title="${t('newGameTitle')}">${t('newGame')}</button>
-              <button data-id="action-mode" class="btn btn-mode" title="${t('modeTitle')}">${t('modePve')}</button>
-              <button data-id="action-save" class="btn btn-secondary" title="${t('saveTitle')}">${t('save')}</button>
-              <button data-id="action-load" class="btn btn-secondary" title="${t('loadTitle')}">${t('load')}</button>
+            <div class="header-tools">
+              <div class="lang-switcher" id="langSwitcher" title="Сменить язык / Switch Language">
+                <button class="lang-btn ${getLang() === 'ru' ? 'active' : ''}" data-lang="ru">RU</button>
+                <button class="lang-btn ${getLang() === 'en' ? 'active' : ''}" data-lang="en">EN</button>
+              </div>
               <button data-id="action-audio" class="btn btn-icon" title="${t('audioTitle')}">🔊</button>
             </div>
+          </div>
+
+          <div class="controls">
+            <button data-id="action-restart" class="btn btn-primary" title="${t('newGameTitle')}">
+              <span class="btn-text full">${t('newGame')}</span>
+              <span class="btn-text short">${t('newGameShort')}</span>
+            </button>
+            <button data-id="action-mode" class="btn btn-mode" title="${t('modeTitle')}">
+              <span class="btn-text full">${t('modePve')}</span>
+              <span class="btn-text short">${t('modePveShort')}</span>
+            </button>
+            <button data-id="action-save" class="btn btn-secondary" title="${t('saveTitle')}">
+              <span class="btn-text full">${t('save')}</span>
+              <span class="btn-text short">${t('saveShort')}</span>
+            </button>
+            <button data-id="action-load" class="btn btn-secondary" title="${t('loadTitle')}">
+              <span class="btn-text full">${t('load')}</span>
+              <span class="btn-text short">${t('loadShort')}</span>
+            </button>
           </div>
         </header>
 
@@ -163,14 +178,47 @@ export default class GamePlay {
         'map-tile',
         `map-tile-${calcTileType(i, this.boardSize)}`,
       );
+      cellEl.setAttribute('role', 'button');
+      cellEl.setAttribute('tabindex', '0');
+
+      let lastTouchTime = 0;
+
       cellEl.addEventListener('mouseenter', (event) => this.onCellEnter(event));
       cellEl.addEventListener('mouseleave', (event) => this.onCellLeave(event));
-      cellEl.addEventListener('click', (event) => this.onCellClick(event));
+
+      cellEl.addEventListener('pointerup', (event) => {
+        if (event.pointerType === 'touch') {
+          lastTouchTime = Date.now();
+          this.onCellEnter(event);
+          this.onCellClick(event);
+        }
+      });
+
+      cellEl.addEventListener('click', (event) => {
+        if (Date.now() - lastTouchTime < 400) return;
+        this.onCellClick(event);
+      });
+
       this.boardEl.appendChild(cellEl);
     }
 
     this.cells = Array.from(this.boardEl.querySelectorAll('.cell'));
     this.applyLanguage();
+  }
+
+  showToast(message, type = 'warning') {
+    let toast = this.container.querySelector('.game-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.className = 'game-toast';
+      this.container.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.className = `game-toast show toast-${type}`;
+    clearTimeout(this.toastTimeout);
+    this.toastTimeout = setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2200);
   }
 
   applyLanguage() {
@@ -182,15 +230,24 @@ export default class GamePlay {
     });
 
     if (this.newGameEl) {
-      this.newGameEl.textContent = t('newGame');
+      const full = this.newGameEl.querySelector('.btn-text.full');
+      const short = this.newGameEl.querySelector('.btn-text.short');
+      if (full) full.textContent = t('newGame');
+      if (short) short.textContent = t('newGameShort');
       this.newGameEl.title = t('newGameTitle');
     }
     if (this.saveGameEl) {
-      this.saveGameEl.textContent = t('save');
+      const full = this.saveGameEl.querySelector('.btn-text.full');
+      const short = this.saveGameEl.querySelector('.btn-text.short');
+      if (full) full.textContent = t('save');
+      if (short) short.textContent = t('saveShort');
       this.saveGameEl.title = t('saveTitle');
     }
     if (this.loadGameEl) {
-      this.loadGameEl.textContent = t('load');
+      const full = this.loadGameEl.querySelector('.btn-text.full');
+      const short = this.loadGameEl.querySelector('.btn-text.short');
+      if (full) full.textContent = t('load');
+      if (short) short.textContent = t('loadShort');
       this.loadGameEl.title = t('loadTitle');
     }
     if (this.audioEl) {
@@ -273,12 +330,27 @@ export default class GamePlay {
 
     if (modeBtn) {
       modeBtn.title = t('modeTitle');
+      const full = modeBtn.querySelector('.btn-text.full');
+      const short = modeBtn.querySelector('.btn-text.short');
+      let fullText = '';
+      let shortText = '';
+
       if (gameMode === 'pve') {
-        modeBtn.textContent = t('modePve');
+        fullText = t('modePve');
+        shortText = t('modePveShort');
       } else if (gameMode === 'pvp') {
-        modeBtn.textContent = t('modePvp');
+        fullText = t('modePvp');
+        shortText = t('modePvpShort');
       } else if (gameMode === 'online') {
-        modeBtn.textContent = t('modeOnline');
+        fullText = t('modeOnline');
+        shortText = t('modeOnlineShort');
+      }
+
+      if (full && short) {
+        full.textContent = fullText;
+        short.textContent = shortText;
+      } else {
+        modeBtn.textContent = fullText;
       }
     }
 
@@ -508,23 +580,28 @@ export default class GamePlay {
   }
 
   onCellEnter(event) {
-    event.preventDefault();
-    const index = this.cells.indexOf(event.currentTarget);
+    if (event.preventDefault) event.preventDefault();
+    const target = event.currentTarget || event.target;
+    const index = this.cells.indexOf(target);
+    if (index === -1) return;
     this.lastEnteredCellIndex = index;
     if (this.playerFrozen) return;
     this.cellEnterListeners.forEach((o) => o.call(null, index));
   }
 
   onCellLeave(event) {
-    event.preventDefault();
-    const index = this.cells.indexOf(event.currentTarget);
+    if (event.preventDefault) event.preventDefault();
+    const target = event.currentTarget || event.target;
+    const index = this.cells.indexOf(target);
+    if (index === -1) return;
     if (this.playerFrozen) return;
     this.cellLeaveListeners.forEach((o) => o.call(null, index));
   }
 
   onCellClick(event) {
-    const index = this.cells.indexOf(event.currentTarget);
-    if (this.playerFrozen) return;
+    const target = event.currentTarget || event.target;
+    const index = this.cells.indexOf(target);
+    if (index === -1) return;
     this.cellClickListeners.forEach((o) => o.call(null, index));
   }
 

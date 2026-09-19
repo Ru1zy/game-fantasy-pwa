@@ -604,7 +604,10 @@ export default class GameController {
       // Проверяем право хода онлайн-игрока
       const isMyTurn = (this.isOnlineHost && this.currentTurn === 'player') ||
                        (!this.isOnlineHost && this.currentTurn === 'enemy');
-      if (!isMyTurn) return;
+      if (!isMyTurn) {
+        this.gamePlay.showToast(t('turnNotYours'), 'warning');
+        return;
+      }
     }
 
     const activeSide = this.currentTurn;
