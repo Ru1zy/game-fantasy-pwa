@@ -1,11 +1,7 @@
 /**
- * Базовый класс, от которого наследуются классы персонажей:
- * swordsman
- * bowman
- * magician
- * daemon
- * undead
- * vampire
+ * Базовый класс персонажей:
+ * swordsman, bowman, magician
+ * daemon, undead, vampire
  */
 export default class Character {
   constructor(level, type = 'generic') {
@@ -14,11 +10,12 @@ export default class Character {
     this.defence = 0;
     this._health = 50;
     this.type = type;
-    // выбросить исключение, если кто-то использует "new Character()"
+
     if (new.target.name === 'Character') {
       throw new Error('Dude, stop call dat. Call already created characters.');
     }
   }
+
   get health() {
     return this._health;
   }
@@ -34,18 +31,19 @@ export default class Character {
   }
 
   calculateDamage(target) {
-    const damage = Math.max(this.attack - target.defence, this.attack * 0.1);
+    const damage = Math.max(this.attack - target.defence, Math.ceil(this.attack * 0.15));
     return Math.ceil(damage);
   }
 
   increaseStats(stat) {
-    const newValue = Math.max(this[stat], (this[stat] * (80 + this.health)) / 100);
-    this[stat] = Math.floor(newValue);
+    // Сбалансированный прирост характеристик (+22% за уровень вместо прежнего сломанного умножения на 1.8x)
+    const bonus = Math.max(3, Math.round(this[stat] * 0.22));
+    this[stat] += bonus;
   }
 
   levelUp() {
     this.level += 1;
-    this.health += 80;
+    this.health += 50; // Восстановление здоровья между раундами
     this.increaseStats('attack');
     this.increaseStats('defence');
   }

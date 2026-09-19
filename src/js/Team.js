@@ -4,7 +4,6 @@ export default class Team {
     this.side = side;
     this.characters = [];
     this.addNewCharacter(allowedTypes, maxLevel, characterCount);
-    console.log(allowedTypes);
   }
 
   *[Symbol.iterator]() {
@@ -28,7 +27,20 @@ export default class Team {
 
   addNewCharacter(allowedTypes, maxLevel, characterCount) {
     for (let i = 1; i <= characterCount; i++) {
-      const newCharacter = this.characterGenerator(allowedTypes, maxLevel, this);
+      let pool = allowedTypes;
+      // Предотвращение появления 2 магов в отряде (неиграбельный спавн на старте)
+      if (
+        this.characters.length === 1 &&
+        (this.characters[0].type === 'magician' || this.characters[0].type === 'daemon')
+      ) {
+        const filtered = allowedTypes.filter(
+          (t) => t.name !== 'Magician' && t.name !== 'Daemon',
+        );
+        if (filtered.length) {
+          pool = filtered;
+        }
+      }
+      const newCharacter = this.characterGenerator(pool, maxLevel);
       this.characters.push(newCharacter);
     }
   }
