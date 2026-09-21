@@ -182,17 +182,38 @@ export default class GamePlay {
       cellEl.setAttribute('tabindex', '0');
 
       let lastTouchTime = 0;
+      let touchStartX = 0;
+      let touchStartY = 0;
 
       cellEl.addEventListener('mouseenter', (event) => this.onCellEnter(event));
       cellEl.addEventListener('mouseleave', (event) => this.onCellLeave(event));
 
-      cellEl.addEventListener('pointerup', (event) => {
-        if (event.pointerType === 'touch') {
-          lastTouchTime = Date.now();
-          this.onCellEnter(event);
-          this.onCellClick(event);
-        }
-      });
+      cellEl.addEventListener(
+        'touchstart',
+        (e) => {
+          if (e.touches && e.touches[0]) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+          }
+        },
+        { passive: true },
+      );
+
+      cellEl.addEventListener(
+        'touchend',
+        (e) => {
+          if (e.changedTouches && e.changedTouches[0]) {
+            const dx = Math.abs(e.changedTouches[0].clientX - touchStartX);
+            const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+            if (dx < 12 && dy < 12) {
+              lastTouchTime = Date.now();
+              this.onCellEnter(e);
+              this.onCellClick(e);
+            }
+          }
+        },
+        { passive: true },
+      );
 
       cellEl.addEventListener('click', (event) => {
         if (Date.now() - lastTouchTime < 400) return;
@@ -580,9 +601,10 @@ export default class GamePlay {
   }
 
   onCellEnter(event) {
-    if (event.preventDefault) event.preventDefault();
-    const target = event.currentTarget || event.target;
-    const index = this.cells.indexOf(target);
+    if (event.preventDefault && event.cancelable) event.preventDefault();
+    const raw = event.currentTarget || event.target;
+    const cell = raw && raw.closest ? raw.closest('.cell') : raw;
+    const index = this.cells.indexOf(cell);
     if (index === -1) return;
     this.lastEnteredCellIndex = index;
     if (this.playerFrozen) return;
@@ -590,17 +612,19 @@ export default class GamePlay {
   }
 
   onCellLeave(event) {
-    if (event.preventDefault) event.preventDefault();
-    const target = event.currentTarget || event.target;
-    const index = this.cells.indexOf(target);
+    if (event.preventDefault && event.cancelable) event.preventDefault();
+    const raw = event.currentTarget || event.target;
+    const cell = raw && raw.closest ? raw.closest('.cell') : raw;
+    const index = this.cells.indexOf(cell);
     if (index === -1) return;
     if (this.playerFrozen) return;
     this.cellLeaveListeners.forEach((o) => o.call(null, index));
   }
 
   onCellClick(event) {
-    const target = event.currentTarget || event.target;
-    const index = this.cells.indexOf(target);
+    const raw = event.currentTarget || event.target;
+    const cell = raw && raw.closest ? raw.closest('.cell') : raw;
+    const index = this.cells.indexOf(cell);
     if (index === -1) return;
     this.cellClickListeners.forEach((o) => o.call(null, index));
   }

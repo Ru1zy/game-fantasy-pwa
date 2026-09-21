@@ -184,13 +184,18 @@ export default class GameController {
 
   launchOnlineMatch() {
     this.startNewGame();
+    this.gameMode = 'online';
+    this.isOnlineHost = true;
+    this.isLevelStart = false;
+    this.currentTurn = 'player';
     const gameState = GameState.from(this);
     this.network.send({ type: 'start_game', state: gameState });
     this.gamePlay.closeLobbyModal();
+    this.playerTurn();
     this.updateHud();
   }
 
-  onNetworkMessage(data) {
+  async onNetworkMessage(data) {
     if (!data) return;
 
     if (data.type === 'ready') {
@@ -217,6 +222,8 @@ export default class GameController {
       this.enemyTeam.characters = enemyChar;
       this.gameMode = 'online';
       this.isOnlineHost = false;
+      this.isLevelStart = false;
+      this.currentTurn = 'player';
       this.gamePlay.changeTheme(this.currentLevel);
       this.gamePlay.clearRanges();
       this.redrawPositions();
@@ -224,14 +231,17 @@ export default class GameController {
       this.updateHud();
       this.gamePlay.closeLobbyModal();
     } else if (data.type === 'action') {
+      this.isLevelStart = false;
       const actor = this.getCharByPosition(data.from);
       if (data.actionType === 'move') {
         this.movement.moveCharacter(actor, data.to);
       } else if (data.actionType === 'attack') {
         const target = this.getCharByPosition(data.to);
-        this.performAttack(actor, target);
+        if (actor && target) {
+          this.performAttack(actor, target);
+        }
       }
-      this.switchTurnInternal();
+      await this.switchTurn();
     } else if (data.type === 'rematch') {
       if (this.isOnlineHost) {
         this.launchOnlineMatch();
@@ -457,13 +467,7 @@ export default class GameController {
   switchTurnInternal() {
     this.selectedChar = null;
     this.gamePlay.clearRanges();
-
-    if (this.isLevelStart) {
-      this.gamePlay.playerFrozen = false;
-      this.currentTurn = 'player';
-      this.updateHud();
-      return;
-    }
+    this.isLevelStart = false;
 
     this.currentTurn = this.currentTurn === 'player' ? 'enemy' : 'player';
     this.updateHud();
@@ -642,6 +646,16 @@ export default class GameController {
       } else {
         this.selectedChar = posChar;
         this.redrawPositions();
+      }
+      return;
+    }
+
+    // Тап по чужому бойцу вне атаки (для просмотра статов на мобильных устройствах)
+    if (this.isCellSide(index, opponentSide) && !this.selectedChar) {
+      const oppChar = this.getCharByPosition(index);
+      if (oppChar) {
+        const info = createCharacterInfo(oppChar.character);
+        this.gamePlay.showToast(info, 'info');
       }
     }
   }
